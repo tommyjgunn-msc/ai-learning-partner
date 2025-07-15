@@ -26,6 +26,7 @@
                     <span class="stat-number" id="needsAttention">-</span>
                     <span class="stat-label">Need Attention</span>
                 </div>
+                <button onclick="exportStudentData()" class="export-btn">Export Report</button>
             </div>
         </header>
 
@@ -68,5 +69,20 @@
     </div>
 
     <script src="faculty-script.js"></script>
+
+    <!-- Add this modal before closing </body> tag -->
+    <div id="studentModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalStudentName">Student Details</h2>
+                <button onclick="closeStudentModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="studentDetailContent">
+                <!-- Content populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

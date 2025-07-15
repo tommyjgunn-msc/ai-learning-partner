@@ -354,11 +354,138 @@ function refreshData() {
 }
 
 function viewStudentDetails(studentName) {
-    alert(`Detailed view for ${studentName} - Coming in next phase!`);
+    const student = studentsData.find(s => s.studentName === studentName);
+    const studentConversations = conversationsData
+        .filter(conv => conv.studentName === studentName)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    document.getElementById('modalStudentName').textContent = `${studentName} - Detailed View`;
+    
+    const content = document.getElementById('studentDetailContent');
+    content.innerHTML = `
+        <div class="student-overview">
+            <h3>Overview</h3>
+            <p><strong>Total Conversations:</strong> ${student.totalConversations || 0}</p>
+            <p><strong>First Conversation:</strong> ${student.firstConversation ? formatDate(student.firstConversation) : 'N/A'}</p>
+            <p><strong>Last Conversation:</strong> ${student.lastConversation ? formatDate(student.lastConversation) : 'N/A'}</p>
+        </div>
+        
+        <div class="conversation-timeline">
+            <h3>Conversation History</h3>
+            ${studentConversations.map(conv => createTimelineItem(conv)).join('')}
+        </div>
+    `;
+    
+    document.getElementById('studentModal').classList.remove('hidden');
+}
+
+function createTimelineItem(conversation) {
+    const markers = conversation.performanceMarkers || {};
+    const markerHtml = Object.keys(markers).map(key => {
+        const marker = markers[key];
+        return `
+            <div class="marker-item">
+                <div class="marker-name">${formatMarkerName(key)}</div>
+                <div class="marker-score">${marker.score || 'N/A'}/10</div>
+                <div class="marker-evidence">"${marker.evidence || 'No evidence recorded'}"</div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div class="timeline-item">
+            <div class="timeline-date">${formatDate(conversation.timestamp)} - Week ${conversation.week}</div>
+            <div class="performance-markers">
+                ${markerHtml}
+            </div>
+        </div>
+    `;
+}
+
+function formatMarkerName(key) {
+    return key.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+}
+
+function closeStudentModal() {
+    document.getElementById('studentModal').classList.add('hidden');
 }
 
 function markContacted(studentName) {
     alert(`Marked ${studentName} as contacted`);
+}
+
+// Add export functions
+function exportStudentData() {
+    const data = studentsData.map(student => {
+        const conversations = conversationsData.filter(conv => 
+            conv.studentName === student.studentName
+        );
+        
+        const latestConversation = conversations[0];
+        const averageScores = calculateAverageScores(conversations);
+        
+        return {
+            studentName: student.studentName,
+            totalConversations: student.totalConversations || 0,
+            lastConversation: student.lastConversation,
+            status: getStudentStatus(student, latestConversation).text,
+            averageCognitiveLoad: averageScores.cognitive_load,
+            averageSocialIntegration: averageScores.social_integration,
+            averageIntellectualCuriosity: averageScores.intellectual_curiosity
+        };
+    });
+    
+    downloadCSV(data, 'student-summary-report.csv');
+}
+
+function calculateAverageScores(conversations) {
+    const markers = ['cognitive_load', 'social_integration', 'intellectual_curiosity'];
+    const averages = {};
+    
+    markers.forEach(marker => {
+        const scores = conversations
+            .map(conv => conv.performanceMarkers?.[marker]?.score)
+            .filter(score => score !== undefined);
+        
+        averages[marker] = scores.length > 0 
+            ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)
+            : 'N/A';
+    });
+    
+    return averages;
+}
+
+function downloadCSV(data, filename) {
+    const csv = convertToCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', filename);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function convertToCSV(data) {
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvHeaders = headers.join(',');
+    
+    const csvRows = data.map(row => 
+        headers.map(header => {
+            const value = row[header];
+            return typeof value === 'string' && value.includes(',') 
+                ? `"${value}"` 
+                : value;
+        }).join(',')
+    );
+    
+    return [csvHeaders, ...csvRows].join('\n');
 }
 
 // Search functionality
