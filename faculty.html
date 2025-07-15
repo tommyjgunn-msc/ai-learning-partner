@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Dashboard - AI Learning Partner</title>
+    <link rel="stylesheet" href="faculty-style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Student Success Dashboard</h1>
+            <div class="header-stats">
+                <div class="stat-card">
+                    <span class="stat-number" id="totalStudents">-</span>
+                    <span class="stat-label">Active Students</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="thisWeekCheckins">-</span>
+                    <span class="stat-label">This Week's Check-ins</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="needsAttention">-</span>
+                    <span class="stat-label">Need Attention</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="dashboard-nav">
+            <button class="nav-btn active" onclick="showOverview()">Overview</button>
+            <button class="nav-btn" onclick="showStudentList()">All Students</button>
+            <button class="nav-btn" onclick="showInterventions()">Interventions Needed</button>
+        </nav>
+
+        <main class="dashboard-main">
+            <div id="overviewSection" class="dashboard-section">
+                <div class="section-header">
+                    <h2>Class Overview</h2>
+                    <button onclick="refreshData()">Refresh Data</button>
+                </div>
+                <div id="overviewContent" class="overview-grid">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div id="studentsSection" class="dashboard-section hidden">
+                <div class="section-header">
+                    <h2>All Students</h2>
+                    <input type="text" id="searchStudents" placeholder="Search students...">
+                </div>
+                <div id="studentsContent" class="students-grid">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div id="interventionsSection" class="dashboard-section hidden">
+                <div class="section-header">
+                    <h2>Students Needing Intervention</h2>
+                </div>
+                <div id="interventionsContent" class="interventions-list">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="faculty-script.js"></script>
+</body>
+</html>

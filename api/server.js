@@ -106,6 +106,107 @@ function parseInsightsFromAnalysis(analysis) {
     return insights.slice(0, 5); // Return top 5 insights
 }
 
+// Add new endpoint for structured marker extraction
+app.post('/extract-markers', async (req, res) => {
+    try {
+        const { conversationData, studentName } = req.body;
+        
+        const prompt = createMarkerExtractionPrompt(conversationData, studentName);
+        
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an expert educational data analyst. Extract specific performance markers from student conversations and return structured JSON data."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            max_tokens: 800,
+            temperature: 0.3
+        });
+        
+        const markersText = completion.choices[0].message.content;
+        const markers = parseMarkersFromResponse(markersText);
+        
+        res.json({
+            success: true,
+            markers: markers,
+            week: getWeekIdentifier()
+        });
+        
+    } catch (error) {
+        console.error('Error extracting markers:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to extract performance markers'
+        });
+    }
+});
+
+function createMarkerExtractionPrompt(conversationData, studentName) {
+    let prompt = `Extract performance markers from this student conversation:\n\nStudent: ${studentName}\n\n`;
+    
+    conversationData.forEach((item, index) => {
+        prompt += `Q: ${item.question}\nA: ${item.answer}\n\n`;
+    });
+    
+    prompt += `Rate each marker from 1-10 and provide evidence quote:
+
+Performance Markers:
+1. Cognitive Load (mental bandwidth available)
+2. Social Integration (meaningful peer connections)
+3. Intellectual Curiosity (engagement beyond requirements)
+4. Identity Coherence (academic-personal integration)
+5. Emotional Regulation (managing stress/setbacks)
+6. Metacognitive Awareness (understanding own learning)
+7. Purpose Alignment (connection to personal goals)
+8. Resilience Building (growth from challenges)
+9. Creative Problem-Solving (tackling novel challenges)
+10. Narrative Coherence (coherent story about growth)
+11. Micro-Recovery (energy management)
+12. Intellectual Risk-Taking (engaging with uncertainty)
+
+Return as JSON:
+{
+  "cognitive_load": {"score": X, "evidence": "quote"},
+  "social_integration": {"score": X, "evidence": "quote"},
+  ...
+}`;
+
+    return prompt;
+}
+
+function parseMarkersFromResponse(response) {
+    try {
+        // Try to extract JSON from the response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+    } catch (error) {
+        console.error('Error parsing markers JSON:', error);
+    }
+    
+    // Fallback: create basic structure
+    return {
+        cognitive_load: {score: 5, evidence: "Unable to extract specific evidence"},
+        social_integration: {score: 5, evidence: "Unable to extract specific evidence"},
+        intellectual_curiosity: {score: 5, evidence: "Unable to extract specific evidence"}
+    };
+}
+
+function getWeekIdentifier() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const onejan = new Date(year, 0, 1);
+    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return `${year}-week-${week}`;
+}
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log(`Using model: ${MODEL_NAME}`);
