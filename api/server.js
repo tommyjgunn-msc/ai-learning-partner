@@ -46,7 +46,7 @@ app.post('/analyze-conversation', async (req, res) => {
             headers: {
                 'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:3000', // Replace with your domain
+                'HTTP-Referer': 'ai-learning-partner.vercel.app', // Replace with your domain
                 'X-Title': 'AI Learning Partner'
             }
         });
