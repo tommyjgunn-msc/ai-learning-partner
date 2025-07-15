@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAwFS_h6G8W19S02RCP5y-21XBanIDIzOQ",
+        authDomain: "ai-learning-partner.firebaseapp.com",
+        projectId: "ai-learning-partner",
+        storageBucket: "ai-learning-partner.firebasestorage.app",
+        messagingSenderId: "891144262835",
+        appId: "1:891144262835:web:182b88ca5dfd57c8530cc6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Learning Partner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Weekly Learning Check-in</h1>
+            <p>Let's reflect on your week and discover insights about your learning journey.</p>
+        </header>
+
+        <div id="loginSection" class="section">
+            <h2>Welcome Back!</h2>
+            <input type="text" id="studentName" placeholder="Enter your name">
+            <button onclick="startConversation()">Start This Week's Conversation</button>
+        </div>
+
+        <div id="conversationSection" class="section hidden">
+            <div id="chatContainer">
+                <div id="messageArea"></div>
+                <div id="inputArea">
+                    <input type="text" id="userInput" placeholder="Type your response...">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="insightsSection" class="section hidden">
+            <h2>Your Learning Insights This Week</h2>
+            <div id="insightsContent"></div>
+            <button onclick="resetConversation()">Complete Check-in</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
