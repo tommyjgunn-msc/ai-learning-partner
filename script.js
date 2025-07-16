@@ -1,6 +1,7 @@
-const API_BASE_URL = 'ai-learning-partner-production.up.railway.app';
+// CORRECTED: Fixed API URL with https://
+const API_BASE_URL = 'https://ai-learning-partner-production.up.railway.app';
 
-// Sample conversation questions - we'll make this smarter later
+// Sample conversation questions
 const conversationQuestions = [
     "How would you describe your energy levels this week when it comes to learning?",
     "What was the most interesting or engaging thing you learned this week?",
@@ -26,6 +27,10 @@ function startConversation() {
         return;
     }
     
+    // Reset conversation data
+    conversationData = [];
+    currentQuestionIndex = 0;
+    
     // Hide login, show conversation
     document.getElementById('loginSection').classList.add('hidden');
     document.getElementById('conversationSection').classList.remove('hidden');
@@ -40,6 +45,7 @@ function askNextQuestion() {
         addMessage(question, 'ai-message');
         currentQuestionIndex++;
     } else {
+        // IMPORTANT: Call finishConversation when all questions are done
         finishConversation();
     }
 }
@@ -59,6 +65,8 @@ function sendMessage() {
         answer: message
     });
     
+    console.log('Stored response:', conversationData[conversationData.length - 1]);
+    
     // Clear input
     userInput.value = '';
     
@@ -75,70 +83,47 @@ function addMessage(message, className) {
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
-function finishConversation() {
+// CORRECTED: This function now properly calls both save and generate functions
+async function finishConversation() {
+    console.log('Finishing conversation with data:', conversationData);
+    
     // Hide conversation, show insights
     document.getElementById('conversationSection').classList.add('hidden');
     document.getElementById('insightsSection').classList.remove('hidden');
     
-    // Generate basic insights (we'll make this AI-powered later)
-    generateInsights();
-}
-
-async function generateInsights() {
-    const insightsContent = document.getElementById('insightsContent');
-    
     // Show loading message
-    insightsContent.innerHTML = '<div class="insight-item">Analyzing your responses... 🤔</div>';
+    const insightsContent = document.getElementById('insightsContent');
+    insightsContent.innerHTML = '<div class="insight-item">Processing your responses... 🤔</div>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                conversationData: conversationData,
-                studentName: studentName
-            })
-        });
+        // STEP 1: Save conversation data to database
+        console.log('Step 1: Saving conversation data...');
+        await saveConversationData();
         
-        const result = await response.json();
-        
-        if (result.success) {
-            // Clear loading message
-            insightsContent.innerHTML = '';
-            
-            // Add AI-generated insights
-            const analysisDiv = document.createElement('div');
-            analysisDiv.className = 'insight-item';
-            analysisDiv.innerHTML = `<h3>Your Learning Insights This Week</h3><p>${result.analysis}</p>`;
-            
-            // Optionally show which model was used
-            if (result.model_used) {
-                const modelInfo = document.createElement('div');
-                modelInfo.className = 'model-info';
-                modelInfo.style.fontSize = '0.8em';
-                modelInfo.style.color = '#666';
-                modelInfo.textContent = `Analysis powered by: ${result.model_used}`;
-                analysisDiv.appendChild(modelInfo);
-            }
-            
-            insightsContent.appendChild(analysisDiv);
-            
-        } else {
-            throw new Error('Analysis failed');
-        }
+        // STEP 2: Generate insights
+        console.log('Step 2: Generating insights...');
+        await generateInsights();
         
     } catch (error) {
-        console.error('Error getting insights:', error);
-        insightsContent.innerHTML = '<div class="insight-item">Sorry, we had trouble analyzing your responses. Please try again later.</div>';
+        console.error('Error in finishConversation:', error);
+        insightsContent.innerHTML = `
+            <div class="insight-item">
+                <h3>Processing Error</h3>
+                <p>There was an issue processing your responses: ${error.message}</p>
+                <p>Please check the console for details and try again.</p>
+            </div>
+        `;
     }
 }
 
-// Update saveConversationData function
+// CORRECTED: Enhanced saveConversationData function
 async function saveConversationData() {
     try {
+        console.log('Saving conversation data for:', studentName);
+        console.log('Conversation data:', conversationData);
+        
         // First, extract performance markers
+        console.log('Extracting performance markers...');
         const markersResponse = await fetch(`${API_BASE_URL}/extract-markers`, {
             method: 'POST',
             headers: {
@@ -150,7 +135,12 @@ async function saveConversationData() {
             })
         });
         
+        if (!markersResponse.ok) {
+            throw new Error(`Markers API error: ${markersResponse.status}`);
+        }
+        
         const markersResult = await markersResponse.json();
+        console.log('Markers result:', markersResult);
         
         // Prepare complete conversation record
         const conversationRecord = {
@@ -162,21 +152,93 @@ async function saveConversationData() {
             completed: true
         };
         
+        console.log('Saving to Firestore:', conversationRecord);
+        
         // Save to Firestore
-        await db.collection('conversations').add(conversationRecord);
+        const docRef = await db.collection('conversations').add(conversationRecord);
+        console.log('Conversation saved with ID:', docRef.id);
         
         // Also update student profile
         await updateStudentProfile(conversationRecord);
         
-        console.log('Conversation saved successfully!');
+        console.log('Conversation data saved successfully!');
         
     } catch (error) {
-        console.error('Error saving conversation:', error);
+        console.error('Error saving conversation data:', error);
+        throw error;
+    }
+}
+
+// CORRECTED: Enhanced generateInsights function
+async function generateInsights() {
+    const insightsContent = document.getElementById('insightsContent');
+    
+    try {
+        console.log('Generating insights for:', studentName);
+        
+        const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                conversationData: conversationData,
+                studentName: studentName
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Analysis API error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Analysis result:', result);
+        
+        if (result.success) {
+            // Clear loading message
+            insightsContent.innerHTML = '';
+            
+            // Add AI-generated insights
+            const analysisDiv = document.createElement('div');
+            analysisDiv.className = 'insight-item';
+            analysisDiv.innerHTML = `
+                <h3>Your Learning Insights This Week</h3>
+                <div class="analysis-content">${result.analysis}</div>
+            `;
+            
+            // Show model info
+            if (result.model_used) {
+                const modelInfo = document.createElement('div');
+                modelInfo.className = 'model-info';
+                modelInfo.style.fontSize = '0.8em';
+                modelInfo.style.color = '#666';
+                modelInfo.style.marginTop = '10px';
+                modelInfo.textContent = `Analysis powered by: ${result.model_used}`;
+                analysisDiv.appendChild(modelInfo);
+            }
+            
+            insightsContent.appendChild(analysisDiv);
+            
+        } else {
+            throw new Error(result.error || 'Analysis failed');
+        }
+        
+    } catch (error) {
+        console.error('Error generating insights:', error);
+        insightsContent.innerHTML = `
+            <div class="insight-item">
+                <h3>Analysis Error</h3>
+                <p>We had trouble analyzing your responses: ${error.message}</p>
+                <p>Your data has been saved, but insights couldn't be generated.</p>
+            </div>
+        `;
     }
 }
 
 async function updateStudentProfile(conversationRecord) {
     try {
+        console.log('Updating student profile for:', studentName);
+        
         const studentProfileRef = db.collection('students').doc(studentName);
         
         // Check if profile exists
@@ -193,6 +255,7 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.update(updatedProfile);
+            console.log('Student profile updated');
         } else {
             // Create new profile
             const newProfile = {
@@ -204,10 +267,12 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.set(newProfile);
+            console.log('New student profile created');
         }
         
     } catch (error) {
         console.error('Error updating student profile:', error);
+        throw error;
     }
 }
 
@@ -218,19 +283,6 @@ function getWeekIdentifier() {
     const onejan = new Date(year, 0, 1);
     const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
     return `${year}-week-${week}`;
-}
-
-// Update the finishConversation function
-function finishConversation() {
-    // Save data before showing insights
-    saveConversationData();
-    
-    // Hide conversation, show insights
-    document.getElementById('conversationSection').classList.add('hidden');
-    document.getElementById('insightsSection').classList.remove('hidden');
-    
-    // Generate basic insights
-    generateInsights();
 }
 
 function resetConversation() {
@@ -249,9 +301,40 @@ function resetConversation() {
     document.getElementById('loginSection').classList.remove('hidden');
 }
 
-// Allow Enter key to send messages
-document.getElementById('userInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendMessage();
+// CORRECTED: Add event listener after DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Allow Enter key to send messages
+    const userInput = document.getElementById('userInput');
+    if (userInput) {
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
     }
+    
+    // Test API connection
+    console.log('Testing API connection...');
+    fetch(`${API_BASE_URL}/`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('API connection successful:', data);
+        })
+        .catch(error => {
+            console.error('API connection failed:', error);
+        });
 });
+
+// ADDED: Debug function to check current state
+function debugCurrentState() {
+    console.log('=== DEBUG STATE ===');
+    console.log('Student Name:', studentName);
+    console.log('Current Question Index:', currentQuestionIndex);
+    console.log('Conversation Data:', conversationData);
+    console.log('API Base URL:', API_BASE_URL);
+    console.log('Firebase initialized:', typeof db !== 'undefined');
+    console.log('==================');
+}
+
+// Make debug function available globally
+window.debugCurrentState = debugCurrentState;
