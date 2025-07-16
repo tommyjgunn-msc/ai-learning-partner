@@ -14,7 +14,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 // Choose your preferred free model here
-const MODEL_NAME = 'google/gemini-2.5-pro-exp-03-25';
+const MODEL_NAME = 'google/gemini-2.5-pro-exp-03-25'; // You can change this to any free model
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -24,16 +24,7 @@ app.get('/', (req, res) => {
 // Analyze conversation endpoint
 app.post('/analyze-conversation', async (req, res) => {
     try {
-        console.log('Analyzing conversation for:', req.body.studentName);
-        
         const { conversationData, studentName } = req.body;
-        
-        if (!conversationData || !studentName) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: conversationData and studentName'
-            });
-        }
         
         const prompt = createAnalysisPrompt(conversationData, studentName);
         
@@ -55,14 +46,12 @@ app.post('/analyze-conversation', async (req, res) => {
             headers: {
                 'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'ai-learning-partner.vercel.app',
+                'HTTP-Referer': 'ai-learning-partner.vercel.app', // Replace with your domain
                 'X-Title': 'AI Learning Partner'
             }
         });
         
         const analysis = response.data.choices[0].message.content;
-        
-        console.log('Analysis completed successfully');
         
         res.json({
             success: true,
@@ -76,67 +65,6 @@ app.post('/analyze-conversation', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to analyze conversation',
-            details: error.response?.data || error.message
-        });
-    }
-});
-
-// FIXED: Extract markers endpoint now uses OpenRouter API consistently
-app.post('/extract-markers', async (req, res) => {
-    try {
-        console.log('Extracting markers for:', req.body.studentName);
-        
-        const { conversationData, studentName } = req.body;
-        
-        if (!conversationData || !studentName) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: conversationData and studentName'
-            });
-        }
-        
-        const prompt = createMarkerExtractionPrompt(conversationData, studentName);
-        
-        // FIXED: Now uses OpenRouter API instead of OpenAI
-        const response = await axios.post(`${OPENROUTER_BASE_URL}/chat/completions`, {
-            model: MODEL_NAME,
-            messages: [
-                {
-                    role: "system",
-                    content: "You are an expert educational data analyst. Extract specific performance markers from student conversations and return structured JSON data."
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
-            max_tokens: 800,
-            temperature: 0.3
-        }, {
-            headers: {
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'ai-learning-partner.vercel.app',
-                'X-Title': 'AI Learning Partner'
-            }
-        });
-        
-        const markersText = response.data.choices[0].message.content;
-        const markers = parseMarkersFromResponse(markersText);
-        
-        console.log('Markers extracted successfully');
-        
-        res.json({
-            success: true,
-            markers: markers,
-            week: getWeekIdentifier()
-        });
-        
-    } catch (error) {
-        console.error('Error extracting markers:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to extract performance markers',
             details: error.response?.data || error.message
         });
     }
@@ -178,6 +106,47 @@ function parseInsightsFromAnalysis(analysis) {
     return insights.slice(0, 5); // Return top 5 insights
 }
 
+// Add new endpoint for structured marker extraction
+app.post('/extract-markers', async (req, res) => {
+    try {
+        const { conversationData, studentName } = req.body;
+        
+        const prompt = createMarkerExtractionPrompt(conversationData, studentName);
+        
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an expert educational data analyst. Extract specific performance markers from student conversations and return structured JSON data."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            max_tokens: 800,
+            temperature: 0.3
+        });
+        
+        const markersText = completion.choices[0].message.content;
+        const markers = parseMarkersFromResponse(markersText);
+        
+        res.json({
+            success: true,
+            markers: markers,
+            week: getWeekIdentifier()
+        });
+        
+    } catch (error) {
+        console.error('Error extracting markers:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to extract performance markers'
+        });
+    }
+});
+
 function createMarkerExtractionPrompt(conversationData, studentName) {
     let prompt = `Extract performance markers from this student conversation:\n\nStudent: ${studentName}\n\n`;
     
@@ -198,19 +167,14 @@ Performance Markers:
 8. Resilience Building (growth from challenges)
 9. Creative Problem-Solving (tackling novel challenges)
 10. Narrative Coherence (coherent story about growth)
+11. Micro-Recovery (energy management)
+12. Intellectual Risk-Taking (engaging with uncertainty)
 
 Return as JSON:
 {
   "cognitive_load": {"score": X, "evidence": "quote"},
   "social_integration": {"score": X, "evidence": "quote"},
-  "intellectual_curiosity": {"score": X, "evidence": "quote"},
-  "identity_coherence": {"score": X, "evidence": "quote"},
-  "emotional_regulation": {"score": X, "evidence": "quote"},
-  "metacognitive_awareness": {"score": X, "evidence": "quote"},
-  "purpose_alignment": {"score": X, "evidence": "quote"},
-  "resilience_building": {"score": X, "evidence": "quote"},
-  "creative_problem_solving": {"score": X, "evidence": "quote"},
-  "narrative_coherence": {"score": X, "evidence": "quote"}
+  ...
 }`;
 
     return prompt;
@@ -231,14 +195,7 @@ function parseMarkersFromResponse(response) {
     return {
         cognitive_load: {score: 5, evidence: "Unable to extract specific evidence"},
         social_integration: {score: 5, evidence: "Unable to extract specific evidence"},
-        intellectual_curiosity: {score: 5, evidence: "Unable to extract specific evidence"},
-        identity_coherence: {score: 5, evidence: "Unable to extract specific evidence"},
-        emotional_regulation: {score: 5, evidence: "Unable to extract specific evidence"},
-        metacognitive_awareness: {score: 5, evidence: "Unable to extract specific evidence"},
-        purpose_alignment: {score: 5, evidence: "Unable to extract specific evidence"},
-        resilience_building: {score: 5, evidence: "Unable to extract specific evidence"},
-        creative_problem_solving: {score: 5, evidence: "Unable to extract specific evidence"},
-        narrative_coherence: {score: 5, evidence: "Unable to extract specific evidence"}
+        intellectual_curiosity: {score: 5, evidence: "Unable to extract specific evidence"}
     };
 }
 
@@ -253,5 +210,4 @@ function getWeekIdentifier() {
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log(`Using model: ${MODEL_NAME}`);
-    console.log(`OpenRouter API Key present: ${!!OPENROUTER_API_KEY}`);
 });
