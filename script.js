@@ -1,6 +1,7 @@
-const API_BASE_URL = 'ai-learning-partner-production.up.railway.app';
+// FIXED: Added protocol to API URL
+const API_BASE_URL = 'https://ai-learning-partner-production.up.railway.app';
 
-// Sample conversation questions - we'll make this smarter later
+// Sample conversation questions
 const conversationQuestions = [
     "How would you describe your energy levels this week when it comes to learning?",
     "What was the most interesting or engaging thing you learned this week?",
@@ -75,70 +76,35 @@ function addMessage(message, className) {
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
+// FIXED: Updated finishConversation function with better error handling
 function finishConversation() {
     // Hide conversation, show insights
     document.getElementById('conversationSection').classList.add('hidden');
     document.getElementById('insightsSection').classList.remove('hidden');
     
-    // Generate basic insights (we'll make this AI-powered later)
-    generateInsights();
-}
-
-async function generateInsights() {
+    // Show loading message immediately
     const insightsContent = document.getElementById('insightsContent');
+    insightsContent.innerHTML = '<div class="insight-item">Processing your responses... 🤔</div>';
     
-    // Show loading message
-    insightsContent.innerHTML = '<div class="insight-item">Analyzing your responses... 🤔</div>';
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                conversationData: conversationData,
-                studentName: studentName
-            })
+    // Save data and generate insights
+    saveConversationData()
+        .then(() => {
+            console.log('Data saved successfully, generating insights...');
+            return generateInsights();
+        })
+        .catch(error => {
+            console.error('Error in finishConversation:', error);
+            insightsContent.innerHTML = '<div class="insight-item">There was an issue processing your responses. Please try again.</div>';
         });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // Clear loading message
-            insightsContent.innerHTML = '';
-            
-            // Add AI-generated insights
-            const analysisDiv = document.createElement('div');
-            analysisDiv.className = 'insight-item';
-            analysisDiv.innerHTML = `<h3>Your Learning Insights This Week</h3><p>${result.analysis}</p>`;
-            
-            // Optionally show which model was used
-            if (result.model_used) {
-                const modelInfo = document.createElement('div');
-                modelInfo.className = 'model-info';
-                modelInfo.style.fontSize = '0.8em';
-                modelInfo.style.color = '#666';
-                modelInfo.textContent = `Analysis powered by: ${result.model_used}`;
-                analysisDiv.appendChild(modelInfo);
-            }
-            
-            insightsContent.appendChild(analysisDiv);
-            
-        } else {
-            throw new Error('Analysis failed');
-        }
-        
-    } catch (error) {
-        console.error('Error getting insights:', error);
-        insightsContent.innerHTML = '<div class="insight-item">Sorry, we had trouble analyzing your responses. Please try again later.</div>';
-    }
 }
 
-// Update saveConversationData function
+// FIXED: Enhanced saveConversationData function with proper error handling
 async function saveConversationData() {
     try {
+        console.log('Starting to save conversation data...');
+        
         // First, extract performance markers
+        console.log('Extracting performance markers...');
         const markersResponse = await fetch(`${API_BASE_URL}/extract-markers`, {
             method: 'POST',
             headers: {
@@ -151,6 +117,7 @@ async function saveConversationData() {
         });
         
         const markersResult = await markersResponse.json();
+        console.log('Markers result:', markersResult);
         
         // Prepare complete conversation record
         const conversationRecord = {
@@ -162,6 +129,7 @@ async function saveConversationData() {
             completed: true
         };
         
+        console.log('Saving to Firestore...');
         // Save to Firestore
         await db.collection('conversations').add(conversationRecord);
         
@@ -172,11 +140,82 @@ async function saveConversationData() {
         
     } catch (error) {
         console.error('Error saving conversation:', error);
+        throw error; // Re-throw so finishConversation can handle it
+    }
+}
+
+// FIXED: Enhanced generateInsights function with better error handling
+async function generateInsights() {
+    const insightsContent = document.getElementById('insightsContent');
+    
+    try {
+        console.log('Generating insights...');
+        
+        const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                conversationData: conversationData,
+                studentName: studentName
+            })
+        });
+        
+        const result = await response.json();
+        console.log('Insights result:', result);
+        
+        if (result.success) {
+            // Clear loading message
+            insightsContent.innerHTML = '';
+            
+            // Add AI-generated insights
+            const analysisDiv = document.createElement('div');
+            analysisDiv.className = 'insight-item';
+            analysisDiv.innerHTML = `
+                <h3>Your Learning Insights This Week</h3>
+                <div class="analysis-text">${result.analysis}</div>
+            `;
+            
+            // Optionally show which model was used
+            if (result.model_used) {
+                const modelInfo = document.createElement('div');
+                modelInfo.className = 'model-info';
+                modelInfo.style.fontSize = '0.8em';
+                modelInfo.style.color = '#666';
+                modelInfo.style.marginTop = '10px';
+                modelInfo.textContent = `Analysis powered by: ${result.model_used}`;
+                analysisDiv.appendChild(modelInfo);
+            }
+            
+            insightsContent.appendChild(analysisDiv);
+            
+        } else {
+            throw new Error(result.error || 'Analysis failed');
+        }
+        
+    } catch (error) {
+        console.error('Error generating insights:', error);
+        insightsContent.innerHTML = `
+            <div class="insight-item">
+                <h3>Oops! Something went wrong</h3>
+                <p>We had trouble analyzing your responses. This could be due to:</p>
+                <ul>
+                    <li>Server connection issues</li>
+                    <li>API rate limits</li>
+                    <li>Temporary service outage</li>
+                </ul>
+                <p>Your responses have been saved. Please try again later or contact support if the problem persists.</p>
+                <p><strong>Error details:</strong> ${error.message}</p>
+            </div>
+        `;
     }
 }
 
 async function updateStudentProfile(conversationRecord) {
     try {
+        console.log('Updating student profile...');
+        
         const studentProfileRef = db.collection('students').doc(studentName);
         
         // Check if profile exists
@@ -193,6 +232,7 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.update(updatedProfile);
+            console.log('Student profile updated');
         } else {
             // Create new profile
             const newProfile = {
@@ -204,10 +244,12 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.set(newProfile);
+            console.log('New student profile created');
         }
         
     } catch (error) {
         console.error('Error updating student profile:', error);
+        throw error;
     }
 }
 
@@ -218,19 +260,6 @@ function getWeekIdentifier() {
     const onejan = new Date(year, 0, 1);
     const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
     return `${year}-week-${week}`;
-}
-
-// Update the finishConversation function
-function finishConversation() {
-    // Save data before showing insights
-    saveConversationData();
-    
-    // Hide conversation, show insights
-    document.getElementById('conversationSection').classList.add('hidden');
-    document.getElementById('insightsSection').classList.remove('hidden');
-    
-    // Generate basic insights
-    generateInsights();
 }
 
 function resetConversation() {
@@ -250,8 +279,31 @@ function resetConversation() {
 }
 
 // Allow Enter key to send messages
-document.getElementById('userInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendMessage();
+document.addEventListener('DOMContentLoaded', function() {
+    const userInput = document.getElementById('userInput');
+    if (userInput) {
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
     }
+});
+
+// ADDED: API connectivity test function
+async function testAPIConnection() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/`);
+        const result = await response.json();
+        console.log('API Connection Test:', result);
+        return result;
+    } catch (error) {
+        console.error('API Connection Failed:', error);
+        return false;
+    }
+}
+
+// ADDED: Test API connection on page load
+document.addEventListener('DOMContentLoaded', function() {
+    testAPIConnection();
 });

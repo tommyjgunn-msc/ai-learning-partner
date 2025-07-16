@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <!-- FIXED: Use consistent Firebase v8 syntax -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
+    // FIXED: Consistent Firebase v8 initialization
     const firebaseConfig = {
         apiKey: "AIzaSyAwFS_h6G8W19S02RCP5y-21XBanIDIzOQ",
         authDomain: "ai-learning-partner.firebaseapp.com",
@@ -14,8 +16,12 @@
         appId: "1:891144262835:web:182b88ca5dfd57c8530cc6"
     };
 
-    const app = initializeApp(firebaseConfig);
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    
+    // Test Firebase connection
+    console.log('Firebase initialized successfully');
     </script>
 
     <meta charset="UTF-8">
@@ -51,7 +57,31 @@
             <div id="insightsContent"></div>
             <button onclick="resetConversation()">Complete Check-in</button>
         </div>
+
+        <!-- ADDED: Status indicator for debugging -->
+        <div id="statusIndicator" style="position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px;">
+            <div id="apiStatus">API: Testing...</div>
+            <div id="firebaseStatus">Firebase: Connected</div>
+        </div>
     </div>
+
     <script src="script.js"></script>
+    
+    <script>
+        // ADDED: Status monitoring
+        document.addEventListener('DOMContentLoaded', function() {
+            // Test API connection and update status
+            fetch('https://ai-learning-partner-production.up.railway.app/')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('apiStatus').textContent = 'API: Connected';
+                    document.getElementById('apiStatus').style.color = '#4CAF50';
+                })
+                .catch(error => {
+                    document.getElementById('apiStatus').textContent = 'API: Disconnected';
+                    document.getElementById('apiStatus').style.color = '#f44336';
+                });
+        });
+    </script>
 </body>
 </html>
