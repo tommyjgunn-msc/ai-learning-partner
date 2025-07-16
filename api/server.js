@@ -14,7 +14,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 // Choose your preferred free model here
-const MODEL_NAME = 'google/gemini-2.5-pro-exp-03-25'; // You can change this to any free model
+const MODEL_NAME = 'deepseek/deepseek-r1-0528:free'; // You can change this to any free model
 
 // Health check endpoint
 app.get('/', (req, res) => {
