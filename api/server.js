@@ -109,12 +109,22 @@ function parseInsightsFromAnalysis(analysis) {
 // Add new endpoint for structured marker extraction
 app.post('/extract-markers', async (req, res) => {
     try {
+        console.log('Extracting markers for:', req.body.studentName);
+        
         const { conversationData, studentName } = req.body;
+        
+        if (!conversationData || !studentName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: conversationData and studentName'
+            });
+        }
         
         const prompt = createMarkerExtractionPrompt(conversationData, studentName);
         
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+        // FIXED: Now uses OpenRouter API instead of OpenAI
+        const response = await axios.post(`${OPENROUTER_BASE_URL}/chat/completions`, {
+            model: MODEL_NAME,
             messages: [
                 {
                     role: "system",
@@ -127,10 +137,19 @@ app.post('/extract-markers', async (req, res) => {
             ],
             max_tokens: 800,
             temperature: 0.3
+        }, {
+            headers: {
+                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'ai-learning-partner.vercel.app',
+                'X-Title': 'AI Learning Partner'
+            }
         });
         
-        const markersText = completion.choices[0].message.content;
+        const markersText = response.data.choices[0].message.content;
         const markers = parseMarkersFromResponse(markersText);
+        
+        console.log('Markers extracted successfully');
         
         res.json({
             success: true,
@@ -142,7 +161,8 @@ app.post('/extract-markers', async (req, res) => {
         console.error('Error extracting markers:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to extract performance markers'
+            error: 'Failed to extract performance markers',
+            details: error.response?.data || error.message
         });
     }
 });
@@ -182,7 +202,6 @@ Return as JSON:
 
 function parseMarkersFromResponse(response) {
     try {
-        // Try to extract JSON from the response
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
@@ -195,7 +214,14 @@ function parseMarkersFromResponse(response) {
     return {
         cognitive_load: {score: 5, evidence: "Unable to extract specific evidence"},
         social_integration: {score: 5, evidence: "Unable to extract specific evidence"},
-        intellectual_curiosity: {score: 5, evidence: "Unable to extract specific evidence"}
+        intellectual_curiosity: {score: 5, evidence: "Unable to extract specific evidence"},
+        identity_coherence: {score: 5, evidence: "Unable to extract specific evidence"},
+        emotional_regulation: {score: 5, evidence: "Unable to extract specific evidence"},
+        metacognitive_awareness: {score: 5, evidence: "Unable to extract specific evidence"},
+        purpose_alignment: {score: 5, evidence: "Unable to extract specific evidence"},
+        resilience_building: {score: 5, evidence: "Unable to extract specific evidence"},
+        creative_problem_solving: {score: 5, evidence: "Unable to extract specific evidence"},
+        narrative_coherence: {score: 5, evidence: "Unable to extract specific evidence"}
     };
 }
 

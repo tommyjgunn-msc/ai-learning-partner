@@ -1,4 +1,4 @@
-// CORRECTED: Fixed API URL with https://
+// FIXED: Added https:// protocol to API URL
 const API_BASE_URL = 'https://ai-learning-partner-production.up.railway.app';
 
 // Sample conversation questions
@@ -31,6 +31,8 @@ function startConversation() {
     conversationData = [];
     currentQuestionIndex = 0;
     
+    console.log('Starting conversation for:', studentName);
+    
     // Hide login, show conversation
     document.getElementById('loginSection').classList.add('hidden');
     document.getElementById('conversationSection').classList.remove('hidden');
@@ -45,7 +47,8 @@ function askNextQuestion() {
         addMessage(question, 'ai-message');
         currentQuestionIndex++;
     } else {
-        // IMPORTANT: Call finishConversation when all questions are done
+        // All questions answered - finish conversation
+        console.log('All questions answered. Finishing conversation...');
         finishConversation();
     }
 }
@@ -83,9 +86,9 @@ function addMessage(message, className) {
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
-// CORRECTED: This function now properly calls both save and generate functions
+// FIXED: This is the CORRECT finishConversation function that calls saveConversationData
 async function finishConversation() {
-    console.log('Finishing conversation with data:', conversationData);
+    console.log('Finishing conversation with', conversationData.length, 'responses');
     
     // Hide conversation, show insights
     document.getElementById('conversationSection').classList.add('hidden');
@@ -116,11 +119,15 @@ async function finishConversation() {
     }
 }
 
-// CORRECTED: Enhanced saveConversationData function
+// FIXED: Enhanced saveConversationData function
 async function saveConversationData() {
     try {
         console.log('Saving conversation data for:', studentName);
         console.log('Conversation data:', conversationData);
+        
+        if (!conversationData || conversationData.length === 0) {
+            throw new Error('No conversation data to save');
+        }
         
         // First, extract performance markers
         console.log('Extracting performance markers...');
@@ -136,7 +143,7 @@ async function saveConversationData() {
         });
         
         if (!markersResponse.ok) {
-            throw new Error(`Markers API error: ${markersResponse.status}`);
+            throw new Error(`Markers API error: ${markersResponse.status} ${markersResponse.statusText}`);
         }
         
         const markersResult = await markersResponse.json();
@@ -169,12 +176,16 @@ async function saveConversationData() {
     }
 }
 
-// CORRECTED: Enhanced generateInsights function
+// FIXED: Enhanced generateInsights function
 async function generateInsights() {
     const insightsContent = document.getElementById('insightsContent');
     
     try {
         console.log('Generating insights for:', studentName);
+        
+        if (!conversationData || conversationData.length === 0) {
+            throw new Error('No conversation data for insights');
+        }
         
         const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
             method: 'POST',
@@ -188,7 +199,7 @@ async function generateInsights() {
         });
         
         if (!response.ok) {
-            throw new Error(`Analysis API error: ${response.status}`);
+            throw new Error(`Analysis API error: ${response.status} ${response.statusText}`);
         }
         
         const result = await response.json();
@@ -203,7 +214,7 @@ async function generateInsights() {
             analysisDiv.className = 'insight-item';
             analysisDiv.innerHTML = `
                 <h3>Your Learning Insights This Week</h3>
-                <div class="analysis-content">${result.analysis}</div>
+                <div class="analysis-content" style="white-space: pre-wrap; line-height: 1.6;">${result.analysis}</div>
             `;
             
             // Show model info
@@ -301,8 +312,10 @@ function resetConversation() {
     document.getElementById('loginSection').classList.remove('hidden');
 }
 
-// CORRECTED: Add event listener after DOM is loaded
+// FIXED: Add event listener after DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up event listeners...');
+    
     // Allow Enter key to send messages
     const userInput = document.getElementById('userInput');
     if (userInput) {
@@ -314,15 +327,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Test API connection
-    console.log('Testing API connection...');
+    console.log('Testing API connection to:', API_BASE_URL);
     fetch(`${API_BASE_URL}/`)
         .then(response => response.json())
         .then(data => {
-            console.log('API connection successful:', data);
+            console.log('✅ API connection successful:', data);
         })
         .catch(error => {
-            console.error('API connection failed:', error);
+            console.error('❌ API connection failed:', error);
         });
+    
+    // Test Firebase connection
+    if (typeof db !== 'undefined') {
+        console.log('✅ Firebase database initialized');
+    } else {
+        console.error('❌ Firebase database not initialized');
+    }
 });
 
 // ADDED: Debug function to check current state
@@ -333,6 +353,7 @@ function debugCurrentState() {
     console.log('Conversation Data:', conversationData);
     console.log('API Base URL:', API_BASE_URL);
     console.log('Firebase initialized:', typeof db !== 'undefined');
+    console.log('Total questions:', conversationQuestions.length);
     console.log('==================');
 }
 
