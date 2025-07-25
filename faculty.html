@@ -3,16 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faculty Dashboard - AI Learning Partner</title>
+    <title>Student Success Dashbaord</title>
     <link rel="stylesheet" href="faculty-style.css">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <div class="dashboard-container">
+    <!-- Password Protection Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-card">
+            <h1>Faculty Dashboard Access</h1>
+            <p>Please enter the faculty password to access the dashboard:</p>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <input 
+                    type="password" 
+                    id="facultyPassword" 
+                    placeholder="Enter faculty password" 
+                    required
+                >
+                <button type="submit">Access Dashboard</button>
+            </form>
+            <div id="loginError" class="error-message hidden">
+                Incorrect password. Please try again.
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard (hidden initially) -->
+    <div id="dashboardContainer" class="dashboard-container hidden">
         <header class="dashboard-header">
-            <h1>Student Success Dashboard</h1>
+            <div class="header-top">
+                <h1>Student Success Dashboard</h1>
+                <button onclick="logout()" class="logout-btn">Logout</button>
+            </div>
             <div class="header-stats">
                 <div class="stat-card">
                     <span class="stat-number" id="totalStudents">-</span>
@@ -31,9 +55,9 @@
         </header>
 
         <nav class="dashboard-nav">
-            <button class="nav-btn active" onclick="showOverview()">Overview</button>
-            <button class="nav-btn" onclick="showStudentList()">All Students</button>
-            <button class="nav-btn" onclick="showInterventions()">Interventions Needed</button>
+            <button class="nav-btn active" data-section="overviewSection" onclick="showSection('overviewSection', this)">Overview</button>
+            <button class="nav-btn" data-section="studentsSection" onclick="showSection('studentsSection', this)">All Students</button>
+            <button class="nav-btn" data-section="interventionsSection" onclick="showSection('interventionsSection', this)">Interventions Needed</button>
         </nav>
 
         <main class="dashboard-main">
@@ -50,7 +74,7 @@
             <div id="studentsSection" class="dashboard-section hidden">
                 <div class="section-header">
                     <h2>All Students</h2>
-                    <input type="text" id="searchStudents" placeholder="Search students...">
+                    <input type="text" id="searchStudents" placeholder="Search students..." onkeyup="filterStudents()">
                 </div>
                 <div id="studentsContent" class="students-grid">
                     <!-- Content will be populated by JavaScript -->
@@ -68,9 +92,7 @@
         </main>
     </div>
 
-    <script src="faculty-script.js"></script>
-
-    <!-- Add this modal before closing </body> tag -->
+    <!-- Student Details Modal -->
     <div id="studentModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -79,10 +101,12 @@
             </div>
             <div class="modal-body">
                 <div id="studentDetailContent">
-                <!-- Content populated by JavaScript -->
+                    <!-- Content populated by JavaScript -->
                 </div>
             </div>
         </div>
     </div>
+
+    <script src="faculty-script.js"></script>
 </body>
 </html>
