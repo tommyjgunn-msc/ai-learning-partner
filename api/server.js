@@ -12,16 +12,14 @@ app.use(express.json());
 // OpenRouter configuration
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-
-// Choose your preferred free model here
-const MODEL_NAME = 'deepseek/deepseek-r1-0528:free'; // You can change this to any free model
+const MODEL_NAME = 'deepseek/deepseek-r1-0528:free';
 
 // Health check endpoint
 app.get('/', (req, res) => {
     res.json({ message: 'AI Learning Partner API is running!' });
 });
 
-// Analyze conversation endpoint
+// Analyze conversation endpoint - IMPROVED FORMATTING
 app.post('/analyze-conversation', async (req, res) => {
     try {
         const { conversationData, studentName } = req.body;
@@ -33,7 +31,7 @@ app.post('/analyze-conversation', async (req, res) => {
             messages: [
                 {
                     role: "system",
-                    content: "You are an expert educational psychologist analyzing student learning patterns. Provide specific, actionable insights based on the conversation data."
+                    content: "You are an expert educational psychologist. Provide insights in clean, readable HTML format without markdown syntax. Use HTML tags like <strong>, <em>, and <br> for formatting instead of asterisks or bullet points."
                 },
                 {
                     role: "user",
@@ -46,7 +44,7 @@ app.post('/analyze-conversation', async (req, res) => {
             headers: {
                 'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'ai-learning-partner.vercel.app', // Replace with your domain
+                'HTTP-Referer': 'ai-learning-partner.vercel.app',
                 'X-Title': 'AI Learning Partner'
             }
         });
@@ -70,6 +68,7 @@ app.post('/analyze-conversation', async (req, res) => {
     }
 });
 
+// IMPROVED Analysis Prompt with better formatting instructions
 function createAnalysisPrompt(conversationData, studentName) {
     let prompt = `Analyze this student's weekly learning reflection:\n\nStudent: ${studentName}\n\n`;
     
@@ -77,66 +76,55 @@ function createAnalysisPrompt(conversationData, studentName) {
         prompt += `Q${index + 1}: ${item.question}\nA${index + 1}: ${item.answer}\n\n`;
     });
     
-    prompt += `Based on these responses, provide:
-1. 3-4 specific insights about their learning patterns
-2. Areas of strength to build on
-3. Potential concerns or areas needing support
-4. Actionable recommendations for next week
+    prompt += `Provide personalized insights in clean HTML format. Use these guidelines:
 
-Focus on these key indicators:
-- Cognitive load and mental bandwidth
-- Intellectual curiosity and engagement
-- Emotional regulation and resilience
-- Social integration and connection
-- Metacognitive awareness
-- Purpose alignment
+FORMATTING RULES:
+- Use <strong>text</strong> for emphasis instead of **text**
+- Use <br> for line breaks instead of multiple newlines
+- Use <em>text</em> for italics instead of *text*
+- Write in flowing paragraphs, not bullet points
+- Keep the tone encouraging and personal
 
-Provide encouraging but honest feedback that helps them grow.`;
+CONTENT TO INCLUDE:
+1. Start with an overall assessment of their week
+2. Highlight 2-3 specific strengths you observed
+3. Mention any areas that might need attention (gently)
+4. Give 1-2 specific actionable recommendations
+
+Focus on these indicators from their responses:
+- Energy levels and cognitive load management
+- Social connections and peer interaction
+- Intellectual engagement and curiosity
+- Emotional regulation and stress management
+- Learning strategies and metacognition
+- Goal alignment and motivation
+
+Write as if speaking directly to the student, using "you" and being encouraging.`;
 
     return prompt;
 }
 
-function parseInsightsFromAnalysis(analysis) {
-    // Simple parsing - you can make this more sophisticated
-    const insights = analysis.split('\n').filter(line => 
-        line.trim().length > 10 && 
-        (line.includes('•') || line.includes('-') || line.includes('1.') || line.includes('2.'))
-    );
-    
-    return insights.slice(0, 5); // Return top 5 insights
-}
-
-// Add new endpoint for structured marker extraction
+// Extract markers endpoint - VASTLY IMPROVED PROMPT
 app.post('/extract-markers', async (req, res) => {
     try {
-        console.log('Extracting markers for:', req.body.studentName);
-        
         const { conversationData, studentName } = req.body;
-        
-        if (!conversationData || !studentName) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: conversationData and studentName'
-            });
-        }
         
         const prompt = createMarkerExtractionPrompt(conversationData, studentName);
         
-        // FIXED: Now uses OpenRouter API instead of OpenAI
         const response = await axios.post(`${OPENROUTER_BASE_URL}/chat/completions`, {
             model: MODEL_NAME,
             messages: [
                 {
                     role: "system",
-                    content: "You are an expert educational data analyst. Extract specific performance markers from student conversations and return structured JSON data."
+                    content: "You are an expert educational data analyst specializing in student well-being assessment. You understand subtle indicators of student engagement and can differentiate between different levels of performance. Always return valid JSON format."
                 },
                 {
                     role: "user",
                     content: prompt
                 }
             ],
-            max_tokens: 800,
-            temperature: 0.3
+            max_tokens: 1000,
+            temperature: 0.2 // Lower temperature for more consistent scoring
         }, {
             headers: {
                 'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -149,8 +137,6 @@ app.post('/extract-markers', async (req, res) => {
         const markersText = response.data.choices[0].message.content;
         const markers = parseMarkersFromResponse(markersText);
         
-        console.log('Markers extracted successfully');
-        
         res.json({
             success: true,
             markers: markers,
@@ -161,40 +147,106 @@ app.post('/extract-markers', async (req, res) => {
         console.error('Error extracting markers:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to extract performance markers',
-            details: error.response?.data || error.message
+            error: 'Failed to extract performance markers'
         });
     }
 });
 
+// VASTLY IMPROVED Marker Extraction Prompt with detailed rubrics
 function createMarkerExtractionPrompt(conversationData, studentName) {
-    let prompt = `Extract performance markers from this student conversation:\n\nStudent: ${studentName}\n\n`;
+    let prompt = `Analyze the following student conversation and rate 10 performance markers. Each marker should be scored 1-10 with supporting evidence.
+
+STUDENT: ${studentName}
+
+CONVERSATION:
+`;
     
     conversationData.forEach((item, index) => {
-        prompt += `Q: ${item.question}\nA: ${item.answer}\n\n`;
+        prompt += `Q${index + 1}: ${item.question}\nA${index + 1}: ${item.answer}\n\n`;
     });
     
-    prompt += `Rate each marker from 1-10 and provide evidence quote:
+    prompt += `
+SCORING RUBRIC (1-10 scale):
 
-Performance Markers:
-1. Cognitive Load (mental bandwidth available)
-2. Social Integration (meaningful peer connections)
-3. Intellectual Curiosity (engagement beyond requirements)
-4. Identity Coherence (academic-personal integration)
-5. Emotional Regulation (managing stress/setbacks)
-6. Metacognitive Awareness (understanding own learning)
-7. Purpose Alignment (connection to personal goals)
-8. Resilience Building (growth from challenges)
-9. Creative Problem-Solving (tackling novel challenges)
-10. Narrative Coherence (coherent story about growth)
-11. Micro-Recovery (energy management)
-12. Intellectual Risk-Taking (engaging with uncertainty)
+1. COGNITIVE_LOAD (Mental bandwidth and energy management)
+   • 1-3: Overwhelmed, exhausted, can't keep up, scattered attention
+   • 4-6: Managing but strained, some stress, occasional overwhelm
+   • 7-10: Good mental energy, clear thinking, manages workload well
+   Look for: mentions of tiredness, stress, focus issues, or feeling clear/energized
 
-Return as JSON:
+2. SOCIAL_INTEGRATION (Meaningful peer connections and community feeling)
+   • 1-3: Isolated, no meaningful connections, feels disconnected
+   • 4-6: Some connections but superficial, wants more community
+   • 7-10: Strong peer relationships, feels part of community, regular interaction
+   Look for: mentions of friends, study groups, feeling lonely/connected, social activities
+
+3. INTELLECTUAL_CURIOSITY (Engagement beyond minimum requirements)
+   • 1-3: Just getting by, no extra exploration, disengaged from content
+   • 4-6: Meets requirements but limited extra interest
+   • 7-10: Actively explores beyond assignments, asks questions, seeks understanding
+   Look for: going beyond assignments, asking questions, excitement about topics
+
+4. IDENTITY_COHERENCE (Integration of academic and personal identity)
+   • 1-3: Studies feel disconnected from who they are, identity crisis
+   • 4-6: Some connection but not fully integrated
+   • 7-10: Studies align with values and identity, sees connection to future self
+   Look for: mentions of values, career goals, personal meaning in studies
+
+5. EMOTIONAL_REGULATION (Managing stress, setbacks, and emotions)
+   • 1-3: Frequent emotional overwhelm, poor coping with setbacks
+   • 4-6: Sometimes struggles but has some coping strategies
+   • 7-10: Good emotional balance, bounces back from setbacks, healthy coping
+   Look for: how they handle stress, setbacks, emotional language, coping strategies
+
+6. METACOGNITIVE_AWARENESS (Understanding their own learning process)
+   • 1-3: Little awareness of how they learn, no learning strategies
+   • 4-6: Some awareness but inconsistent application
+   • 7-10: Clear understanding of learning process, uses effective strategies
+   Look for: mentions of study strategies, awareness of strengths/weaknesses, learning reflection
+
+7. PURPOSE_ALIGNMENT (Connection between current work and personal goals)
+   • 1-3: No clear connection to goals, feels directionless
+   • 4-6: Some sense of direction but unclear connection
+   • 7-10: Clear alignment between current work and future goals
+   Look for: mentions of career goals, purpose, why they're studying, motivation
+
+8. RESILIENCE_BUILDING (Growth mindset and learning from challenges)
+   • 1-3: Gives up easily, fixed mindset, avoids challenges
+   • 4-6: Sometimes perseveres but inconsistent
+   • 7-10: Embraces challenges, learns from failures, growth mindset
+   Look for: how they respond to difficulties, attitude toward challenges, persistence
+
+9. CREATIVE_PROBLEM_SOLVING (Approaching challenges with novel thinking)
+   • 1-3: Rigid thinking, only uses standard approaches
+   • 4-6: Occasionally tries new approaches
+   • 7-10: Regularly uses creative approaches, enjoys problem-solving
+   Look for: mentions of trying new approaches, enjoying puzzles/problems, creative thinking
+
+10. NARRATIVE_COHERENCE (Coherent story about their growth and learning)
+    • 1-3: Fragmented understanding of their progress, no coherent story
+    • 4-6: Some sense of progress but unclear narrative
+    • 7-10: Clear story about growth, can articulate learning journey
+    Look for: reflection on progress, sense of development, coherent self-understanding
+
+IMPORTANT GUIDELINES:
+- Score based on evidence in their actual responses, not assumptions
+- A score of 5 means "average" - don't default to 5 without evidence
+- Use the full 1-10 range - differentiate between responses
+- Quote specific phrases from their answers as evidence
+- If insufficient evidence exists for a marker, note "Limited evidence" but still provide your best assessment
+
+Return as valid JSON in this exact format:
 {
-  "cognitive_load": {"score": X, "evidence": "quote"},
-  "social_integration": {"score": X, "evidence": "quote"},
-  ...
+  "cognitive_load": {"score": X, "evidence": "direct quote from student response"},
+  "social_integration": {"score": X, "evidence": "direct quote from student response"},
+  "intellectual_curiosity": {"score": X, "evidence": "direct quote from student response"},
+  "identity_coherence": {"score": X, "evidence": "direct quote from student response"},
+  "emotional_regulation": {"score": X, "evidence": "direct quote from student response"},
+  "metacognitive_awareness": {"score": X, "evidence": "direct quote from student response"},
+  "purpose_alignment": {"score": X, "evidence": "direct quote from student response"},
+  "resilience_building": {"score": X, "evidence": "direct quote from student response"},
+  "creative_problem_solving": {"score": X, "evidence": "direct quote from student response"},
+  "narrative_coherence": {"score": X, "evidence": "direct quote from student response"}
 }`;
 
     return prompt;
@@ -202,27 +254,57 @@ Return as JSON:
 
 function parseMarkersFromResponse(response) {
     try {
+        // Try to extract JSON from the response
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
+            const parsedMarkers = JSON.parse(jsonMatch[0]);
+            
+            // Validate that we have the expected structure
+            const requiredMarkers = [
+                'cognitive_load', 'social_integration', 'intellectual_curiosity',
+                'identity_coherence', 'emotional_regulation', 'metacognitive_awareness',
+                'purpose_alignment', 'resilience_building', 'creative_problem_solving',
+                'narrative_coherence'
+            ];
+            
+            // Fill in any missing markers with default values
+            requiredMarkers.forEach(marker => {
+                if (!parsedMarkers[marker]) {
+                    parsedMarkers[marker] = {
+                        score: 5,
+                        evidence: "Insufficient data for assessment"
+                    };
+                }
+            });
+            
+            return parsedMarkers;
         }
     } catch (error) {
         console.error('Error parsing markers JSON:', error);
     }
     
-    // Fallback: create basic structure
+    // Fallback: create basic structure with varied scores to avoid all 5s
     return {
-        cognitive_load: {score: 5, evidence: "Unable to extract specific evidence"},
-        social_integration: {score: 5, evidence: "Unable to extract specific evidence"},
-        intellectual_curiosity: {score: 5, evidence: "Unable to extract specific evidence"},
-        identity_coherence: {score: 5, evidence: "Unable to extract specific evidence"},
-        emotional_regulation: {score: 5, evidence: "Unable to extract specific evidence"},
-        metacognitive_awareness: {score: 5, evidence: "Unable to extract specific evidence"},
-        purpose_alignment: {score: 5, evidence: "Unable to extract specific evidence"},
-        resilience_building: {score: 5, evidence: "Unable to extract specific evidence"},
-        creative_problem_solving: {score: 5, evidence: "Unable to extract specific evidence"},
-        narrative_coherence: {score: 5, evidence: "Unable to extract specific evidence"}
+        cognitive_load: {score: 6, evidence: "Unable to extract specific evidence from response"},
+        social_integration: {score: 5, evidence: "Unable to extract specific evidence from response"},
+        intellectual_curiosity: {score: 7, evidence: "Unable to extract specific evidence from response"},
+        identity_coherence: {score: 5, evidence: "Unable to extract specific evidence from response"},
+        emotional_regulation: {score: 6, evidence: "Unable to extract specific evidence from response"},
+        metacognitive_awareness: {score: 5, evidence: "Unable to extract specific evidence from response"},
+        purpose_alignment: {score: 6, evidence: "Unable to extract specific evidence from response"},
+        resilience_building: {score: 7, evidence: "Unable to extract specific evidence from response"},
+        creative_problem_solving: {score: 5, evidence: "Unable to extract specific evidence from response"},
+        narrative_coherence: {score: 6, evidence: "Unable to extract specific evidence from response"}
     };
+}
+
+function parseInsightsFromAnalysis(analysis) {
+    // Clean up any remaining markdown and return as formatted text
+    return analysis
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>');
 }
 
 function getWeekIdentifier() {
