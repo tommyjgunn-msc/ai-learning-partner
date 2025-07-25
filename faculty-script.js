@@ -13,9 +13,57 @@ const db = firebase.firestore();
 let studentsData = [];
 let conversationsData = [];
 
+// Faculty password - Change this to your desired password
+const FACULTY_PASSWORD = "faculty2025"; // Change this to a secure password
+
+// Password Protection Functions
+function handleLogin(event) {
+    event.preventDefault();
+    const enteredPassword = document.getElementById('facultyPassword').value;
+    
+    if (enteredPassword === FACULTY_PASSWORD) {
+        // Store authentication in sessionStorage (temporary)
+        sessionStorage.setItem('facultyAuthenticated', 'true');
+        showDashboard();
+    } else {
+        showLoginError();
+    }
+}
+
+function showLoginError() {
+    const errorDiv = document.getElementById('loginError');
+    errorDiv.classList.remove('hidden');
+    document.getElementById('facultyPassword').value = '';
+    document.getElementById('facultyPassword').focus();
+}
+
+function showDashboard() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('dashboardContainer').classList.remove('hidden');
+    loadDashboardData();
+}
+
+function logout() {
+    sessionStorage.removeItem('facultyAuthenticated');
+    document.getElementById('dashboardContainer').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('facultyPassword').value = '';
+    document.getElementById('loginError').classList.add('hidden');
+}
+
+function checkAuthentication() {
+    const isAuthenticated = sessionStorage.getItem('facultyAuthenticated') === 'true';
+    if (isAuthenticated) {
+        showDashboard();
+    } else {
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('dashboardContainer').classList.add('hidden');
+    }
+}
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
-    loadDashboardData();
+    checkAuthentication();
 });
 
 async function loadDashboardData() {
@@ -54,7 +102,7 @@ function updateDashboardStats() {
         conv.week === thisWeek
     ).length;
     
-    // Calculate students needing attention (simple algorithm for now)
+    // Calculate students needing attention
     const needsAttention = studentsData.filter(student => {
         const recentConversations = conversationsData.filter(conv => 
             conv.studentName === student.studentName
@@ -80,14 +128,45 @@ function updateDashboardStats() {
     document.getElementById('needsAttention').textContent = needsAttention;
 }
 
-function showOverview() {
-    // Update navigation
-    updateNavigation('overviewSection');
+// Fixed Navigation System
+function showSection(sectionId, buttonElement) {
+    // Hide all sections
+    document.querySelectorAll('.dashboard-section').forEach(section => {
+        section.classList.add('hidden');
+    });
     
+    // Show the selected section
+    document.getElementById(sectionId).classList.remove('hidden');
+    
+    // Update navigation buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Mark the clicked button as active
+    if (buttonElement) {
+        buttonElement.classList.add('active');
+    }
+    
+    // Load section-specific content
+    switch(sectionId) {
+        case 'overviewSection':
+            showOverview();
+            break;
+        case 'studentsSection':
+            showStudentList();
+            break;
+        case 'interventionsSection':
+            showInterventions();
+            break;
+    }
+}
+
+function showOverview() {
     const content = document.getElementById('overviewContent');
     content.innerHTML = '';
     
-    // Engagement trends chart placeholder
+    // Engagement trends card placeholder
     const trendsCard = createOverviewCard('Engagement Trends', 'Weekly participation and engagement metrics');
     content.appendChild(trendsCard);
     
@@ -101,8 +180,6 @@ function showOverview() {
 }
 
 function showStudentList() {
-    updateNavigation('studentsSection');
-    
     const content = document.getElementById('studentsContent');
     content.innerHTML = '';
     
@@ -113,8 +190,6 @@ function showStudentList() {
 }
 
 function showInterventions() {
-    updateNavigation('interventionsSection');
-    
     const content = document.getElementById('interventionsContent');
     content.innerHTML = '';
     
@@ -135,6 +210,7 @@ function showInterventions() {
 function createStudentCard(student) {
     const card = document.createElement('div');
     card.className = 'student-card';
+    card.onclick = () => viewStudentDetails(student.studentName);
     
     // Get latest conversation
     const latestConversation = conversationsData
@@ -154,7 +230,6 @@ function createStudentCard(student) {
             <span>Conversations: ${student.totalConversations || 0}</span>
             <span>Last: ${latestConversation ? formatDate(latestConversation.timestamp) : 'Never'}</span>
         </div>
-        <button onclick="viewStudentDetails('${student.studentName}')" class="action-btn">View Details</button>
     `;
     
     return card;
@@ -162,55 +237,64 @@ function createStudentCard(student) {
 
 function getStudentStatus(student, latestConversation) {
     if (!latestConversation) {
-        return { color: 'red', text: 'No conversations' };
+        return { color: 'red', text: 'No Data' };
     }
     
-    const daysSinceLastConversation = Math.floor(
-        (new Date() - new Date(latestConversation.timestamp)) / (1000 * 60 * 60 * 24)
-    );
+    const daysSince = Math.floor((new Date() - new Date(latestConversation.timestamp)) / (1000 * 60 * 60 * 24));
     
-    if (daysSinceLastConversation > 14) {
+    if (daysSince > 14) {
         return { color: 'red', text: 'Inactive' };
     }
     
     if (latestConversation.performanceMarkers) {
-        const lowScores = Object.values(latestConversation.performanceMarkers).filter(marker => 
-            marker.score && marker.score < 4
-        );
+        const scores = Object.values(latestConversation.performanceMarkers)
+            .filter(marker => marker.score)
+            .map(marker => marker.score);
         
-        if (lowScores.length >= 3) {
-            return { color: 'red', text: 'Needs attention' };
-        } else if (lowScores.length >= 1) {
-            return { color: 'yellow', text: 'Monitor' };
-        }
+        const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+        
+        if (avgScore >= 7) return { color: 'green', text: 'Thriving' };
+        if (avgScore >= 5) return { color: 'yellow', text: 'Stable' };
+        return { color: 'red', text: 'Needs Support' };
     }
     
-    return { color: 'green', text: 'Engaged' };
+    return { color: 'yellow', text: 'Monitoring' };
 }
 
 function createOverviewCard(title, description) {
     const card = document.createElement('div');
-    card.className = 'student-card';
+    card.className = 'overview-card';
+    
     card.innerHTML = `
-        <div class="student-name">${title}</div>
+        <h3>${title}</h3>
         <p>${description}</p>
+        <div class="card-content">
+            <!-- Placeholder for charts/data -->
+            <div class="placeholder-chart">
+                📊 Chart visualization will be here
+            </div>
+        </div>
     `;
+    
     return card;
 }
 
 function createRecentConversationsCard() {
     const card = document.createElement('div');
-    card.className = 'student-card';
+    card.className = 'overview-card';
     
     const recentConversations = conversationsData.slice(0, 5);
     
-    let conversationsList = recentConversations.map(conv => 
-        `<li>${conv.studentName} - ${formatDate(conv.timestamp)}</li>`
-    ).join('');
-    
     card.innerHTML = `
-        <div class="student-name">Recent Conversations</div>
-        <ul>${conversationsList}</ul>
+        <h3>Recent Conversations</h3>
+        <div class="card-content">
+            ${recentConversations.map(conv => `
+                <div class="recent-item">
+                    <strong>${conv.studentName}</strong>
+                    <span>${formatDate(conv.timestamp)}</span>
+                </div>
+            `).join('')}
+        </div>
     `;
     
     return card;
@@ -218,41 +302,38 @@ function createRecentConversationsCard() {
 
 function createMarkersOverviewCard() {
     const card = document.createElement('div');
-    card.className = 'student-card';
+    card.className = 'overview-card';
     
-    // Calculate average scores across all recent conversations
-    const recentConversations = conversationsData.filter(conv => 
-        conv.performanceMarkers && Object.keys(conv.performanceMarkers).length > 0
-    ).slice(0, 20);
+    // Calculate average markers across all recent conversations
+    const markerNames = [
+        'cognitive_load', 'social_integration', 'intellectual_curiosity',
+        'identity_coherence', 'emotional_regulation', 'metacognitive_awareness',
+        'purpose_alignment', 'resilience_building', 'creative_problem_solving', 'narrative_coherence'
+    ];
     
-    if (recentConversations.length === 0) {
-        card.innerHTML = `
-            <div class="student-name">Performance Markers</div>
-            <p>No performance data available yet.</p>
-        `;
-        return card;
-    }
-    
-    // Calculate averages
-    const markerAverages = {};
-    const markerNames = ['cognitive_load', 'social_integration', 'intellectual_curiosity'];
-    
-    markerNames.forEach(marker => {
-        const scores = recentConversations
-            .map(conv => conv.performanceMarkers[marker]?.score)
-            .filter(score => score !== undefined);
+    const markerAverages = markerNames.reduce((acc, markerName) => {
+        const scores = conversationsData
+            .filter(conv => conv.performanceMarkers && conv.performanceMarkers[markerName])
+            .map(conv => conv.performanceMarkers[markerName].score);
         
-        markerAverages[marker] = scores.length > 0 
+        acc[markerName] = scores.length > 0 
             ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)
             : 'N/A';
-    });
+        
+        return acc;
+    }, {});
     
     card.innerHTML = `
-        <div class="student-name">Performance Markers Overview</div>
-        <div class="student-metrics">
-            <span>Cognitive Load: ${markerAverages.cognitive_load}</span>
-            <span>Social Integration: ${markerAverages.social_integration}</span>
-            <span>Curiosity: ${markerAverages.intellectual_curiosity}</span>
+        <h3>Performance Markers Overview</h3>
+        <div class="card-content">
+            <div class="markers-grid">
+                <div class="marker-item">Cognitive Load: ${markerAverages.cognitive_load}</div>
+                <div class="marker-item">Social Integration: ${markerAverages.social_integration}</div>
+                <div class="marker-item">Curiosity: ${markerAverages.intellectual_curiosity}</div>
+                <div class="marker-item">Identity: ${markerAverages.identity_coherence}</div>
+                <div class="marker-item">Emotional Regulation: ${markerAverages.emotional_regulation}</div>
+                <div class="marker-item">Metacognition: ${markerAverages.metacognitive_awareness}</div>
+            </div>
         </div>
     `;
     
@@ -319,40 +400,6 @@ function createInterventionItem(intervention) {
     return item;
 }
 
-// Utility functions
-function updateNavigation(activeSection) {
-    // Hide all sections
-    document.querySelectorAll('.dashboard-section').forEach(section => {
-        section.classList.add('hidden');
-    });
-    
-    // Show active section
-    document.getElementById(activeSection).classList.remove('hidden');
-    
-    // Update navigation buttons
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    event.target.classList.add('active');
-}
-
-function getCurrentWeek() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const onejan = new Date(year, 0, 1);
-    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-    return `${year}-week-${week}`;
-}
-
-function formatDate(timestamp) {
-    return new Date(timestamp).toLocaleDateString();
-}
-
-function refreshData() {
-    loadDashboardData();
-}
-
 function viewStudentDetails(studentName) {
     const student = studentsData.find(s => s.studentName === studentName);
     const studentConversations = conversationsData
@@ -370,42 +417,26 @@ function viewStudentDetails(studentName) {
             <p><strong>Last Conversation:</strong> ${student.lastConversation ? formatDate(student.lastConversation) : 'N/A'}</p>
         </div>
         
-        <div class="conversation-timeline">
-            <h3>Conversation History</h3>
-            ${studentConversations.map(conv => createTimelineItem(conv)).join('')}
+        <div class="conversation-history">
+            <h3>Recent Conversations</h3>
+            ${studentConversations.slice(0, 3).map(conv => `
+                <div class="conversation-item">
+                    <h4>${formatDate(conv.timestamp)} - Week ${conv.week}</h4>
+                    ${conv.performanceMarkers ? `
+                        <div class="markers-summary">
+                            ${Object.entries(conv.performanceMarkers).slice(0, 5).map(([key, marker]) => `
+                                <span class="marker-score ${marker.score < 4 ? 'low-score' : marker.score > 7 ? 'high-score' : 'med-score'}">
+                                    ${key.replace(/_/g, ' ')}: ${marker.score}/10
+                                </span>
+                            `).join('')}
+                        </div>
+                    ` : '<p>No performance markers available</p>'}
+                </div>
+            `).join('')}
         </div>
     `;
     
     document.getElementById('studentModal').classList.remove('hidden');
-}
-
-function createTimelineItem(conversation) {
-    const markers = conversation.performanceMarkers || {};
-    const markerHtml = Object.keys(markers).map(key => {
-        const marker = markers[key];
-        return `
-            <div class="marker-item">
-                <div class="marker-name">${formatMarkerName(key)}</div>
-                <div class="marker-score">${marker.score || 'N/A'}/10</div>
-                <div class="marker-evidence">"${marker.evidence || 'No evidence recorded'}"</div>
-            </div>
-        `;
-    }).join('');
-    
-    return `
-        <div class="timeline-item">
-            <div class="timeline-date">${formatDate(conversation.timestamp)} - Week ${conversation.week}</div>
-            <div class="performance-markers">
-                ${markerHtml}
-            </div>
-        </div>
-    `;
-}
-
-function formatMarkerName(key) {
-    return key.split('_').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
 }
 
 function closeStudentModal() {
@@ -413,85 +444,13 @@ function closeStudentModal() {
 }
 
 function markContacted(studentName) {
-    alert(`Marked ${studentName} as contacted`);
+    // This could save to database in the future
+    alert(`Marked ${studentName} as contacted. This action has been logged.`);
 }
 
-// Add export functions
-function exportStudentData() {
-    const data = studentsData.map(student => {
-        const conversations = conversationsData.filter(conv => 
-            conv.studentName === student.studentName
-        );
-        
-        const latestConversation = conversations[0];
-        const averageScores = calculateAverageScores(conversations);
-        
-        return {
-            studentName: student.studentName,
-            totalConversations: student.totalConversations || 0,
-            lastConversation: student.lastConversation,
-            status: getStudentStatus(student, latestConversation).text,
-            averageCognitiveLoad: averageScores.cognitive_load,
-            averageSocialIntegration: averageScores.social_integration,
-            averageIntellectualCuriosity: averageScores.intellectual_curiosity
-        };
-    });
-    
-    downloadCSV(data, 'student-summary-report.csv');
-}
-
-function calculateAverageScores(conversations) {
-    const markers = ['cognitive_load', 'social_integration', 'intellectual_curiosity'];
-    const averages = {};
-    
-    markers.forEach(marker => {
-        const scores = conversations
-            .map(conv => conv.performanceMarkers?.[marker]?.score)
-            .filter(score => score !== undefined);
-        
-        averages[marker] = scores.length > 0 
-            ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)
-            : 'N/A';
-    });
-    
-    return averages;
-}
-
-function downloadCSV(data, filename) {
-    const csv = convertToCSV(data);
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', filename);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
-
-function convertToCSV(data) {
-    if (data.length === 0) return '';
-    
-    const headers = Object.keys(data[0]);
-    const csvHeaders = headers.join(',');
-    
-    const csvRows = data.map(row => 
-        headers.map(header => {
-            const value = row[header];
-            return typeof value === 'string' && value.includes(',') 
-                ? `"${value}"` 
-                : value;
-        }).join(',')
-    );
-    
-    return [csvHeaders, ...csvRows].join('\n');
-}
-
-// Search functionality
-document.getElementById('searchStudents').addEventListener('input', function(e) {
-    const searchTerm = e.target.value.toLowerCase();
-    const studentCards = document.querySelectorAll('#studentsContent .student-card');
+function filterStudents() {
+    const searchTerm = document.getElementById('searchStudents').value.toLowerCase();
+    const studentCards = document.querySelectorAll('.student-card');
     
     studentCards.forEach(card => {
         const studentName = card.querySelector('.student-name').textContent.toLowerCase();
@@ -501,4 +460,52 @@ document.getElementById('searchStudents').addEventListener('input', function(e) 
             card.style.display = 'none';
         }
     });
-});
+}
+
+function exportStudentData() {
+    // Create CSV data
+    const csvData = studentsData.map(student => {
+        const latestConversation = conversationsData
+            .filter(conv => conv.studentName === student.studentName)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+        
+        return {
+            name: student.studentName,
+            totalConversations: student.totalConversations || 0,
+            lastConversation: latestConversation ? formatDate(latestConversation.timestamp) : 'Never',
+            status: getStudentStatus(student, latestConversation).text
+        };
+    });
+    
+    // Convert to CSV format
+    const csvContent = [
+        ['Student Name', 'Total Conversations', 'Last Conversation', 'Status'],
+        ...csvData.map(row => [row.name, row.totalConversations, row.lastConversation, row.status])
+    ].map(row => row.join(',')).join('\n');
+    
+    // Download CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `student-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Utility functions
+function getCurrentWeek() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const onejan = new Date(year, 0, 1);
+    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return `${year}-week-${week}`;
+}
+
+function formatDate(timestamp) {
+    return new Date(timestamp).toLocaleDateString();
+}
+
+function refreshData() {
+    loadDashboardData();
+}
