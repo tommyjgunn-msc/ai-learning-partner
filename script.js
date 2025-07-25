@@ -1,23 +1,43 @@
-// FIXED: Added https:// protocol to API URL
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyAwFS_h6G8W19S02RCP5y-21XBanIDIzOQ",
+    authDomain: "ai-learning-partner.firebaseapp.com",
+    projectId: "ai-learning-partner",
+    storageBucket: "ai-learning-partner.firebasestorage.app",
+    messagingSenderId: "891144262835",
+    appId: "1:891144262835:web:182b88ca5dfd57c8530cc6"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Application configuration
 const API_BASE_URL = 'https://ai-learning-partner-production.up.railway.app';
 
-// Sample conversation questions
-const conversationQuestions = [
-    "How would you describe your energy levels this week when it comes to learning?",
-    "What was the most interesting or engaging thing you learned this week?",
-    "Did you face any challenges that made you want to give up? How did you handle them?",
-    "How connected do you feel to your classmates and the learning community?",
-    "What questions are you most curious about right now in your studies?",
-    "How well do you feel you understood your own learning process this week?",
-    "How aligned do your current studies feel with your personal goals and interests?",
-    "When you encountered difficulties, how did you bounce back?",
-    "Did you try any new approaches to learning or problem-solving this week?",
-    "How would you summarize your overall learning story this week?"
-];
-
+// Application state
 let currentQuestionIndex = 0;
 let conversationData = [];
 let studentName = '';
+
+// Learning reflection questions
+const questions = [
+    "How would you describe your energy levels and mental clarity this week?",
+    "What moments this week made you feel most engaged or excited about learning?",
+    "How did you handle any challenges or setbacks you encountered?",
+    "Describe your interactions with classmates or study partners this week.",
+    "What study strategies or approaches worked well for you this week?",
+    "How does your current coursework connect to your personal goals or interests?",
+    "When did you feel most confident in your abilities this week?",
+    "What questions or topics sparked your curiosity beyond the required work?",
+    "How did you manage stress or overwhelming moments this week?",
+    "Looking back, what's one thing you learned about yourself as a learner this week?"
+];
+
+// Initialize application
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('AI Learning Partner application started');
+});
 
 function startConversation() {
     studentName = document.getElementById('studentName').value.trim();
@@ -27,54 +47,59 @@ function startConversation() {
         return;
     }
     
-    // Reset conversation data
-    conversationData = [];
+    // Reset conversation state
     currentQuestionIndex = 0;
-    
-    console.log('Starting conversation for:', studentName);
+    conversationData = [];
     
     // Hide login, show conversation
     document.getElementById('loginSection').classList.add('hidden');
     document.getElementById('conversationSection').classList.remove('hidden');
     
-    // Start first question
-    askNextQuestion();
+    // Start with first question
+    askQuestion();
 }
 
-function askNextQuestion() {
-    if (currentQuestionIndex < conversationQuestions.length) {
-        const question = conversationQuestions[currentQuestionIndex];
-        addMessage(question, 'ai-message');
-        currentQuestionIndex++;
+function askQuestion() {
+    const messageArea = document.getElementById('messageArea');
+    const userInput = document.getElementById('userInput');
+    
+    if (currentQuestionIndex < questions.length) {
+        const question = questions[currentQuestionIndex];
+        addMessage(`Question ${currentQuestionIndex + 1}: ${question}`, 'bot-message');
+        userInput.focus();
     } else {
-        // All questions answered - finish conversation
-        console.log('All questions answered. Finishing conversation...');
+        // All questions completed
         finishConversation();
     }
 }
 
 function sendMessage() {
     const userInput = document.getElementById('userInput');
-    const message = userInput.value.trim();
+    const answer = userInput.value.trim();
     
-    if (!message) return;
+    if (!answer) {
+        return;
+    }
     
-    // Add user message to chat
-    addMessage(message, 'user-message');
+    // Display user's answer
+    addMessage(answer, 'user-message');
     
-    // Store the conversation data
+    // Store the Q&A pair
     conversationData.push({
-        question: conversationQuestions[currentQuestionIndex - 1],
-        answer: message
+        question: questions[currentQuestionIndex],
+        answer: answer
     });
-    
-    console.log('Stored response:', conversationData[conversationData.length - 1]);
     
     // Clear input
     userInput.value = '';
     
-    // Ask next question after a brief pause
-    setTimeout(askNextQuestion, 1000);
+    // Move to next question
+    currentQuestionIndex++;
+    
+    // Small delay before next question for better UX
+    setTimeout(() => {
+        askQuestion();
+    }, 1000);
 }
 
 function addMessage(message, className) {
@@ -86,107 +111,31 @@ function addMessage(message, className) {
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
-// FIXED: This is the CORRECT finishConversation function that calls saveConversationData
 async function finishConversation() {
-    console.log('Finishing conversation with', conversationData.length, 'responses');
-    
     // Hide conversation, show insights
     document.getElementById('conversationSection').classList.add('hidden');
     document.getElementById('insightsSection').classList.remove('hidden');
     
-    // Show loading message
-    const insightsContent = document.getElementById('insightsContent');
-    insightsContent.innerHTML = '<div class="insight-item">Processing your responses... 🤔</div>';
-    
-    try {
-        // STEP 1: Save conversation data to database
-        console.log('Step 1: Saving conversation data...');
-        await saveConversationData();
-        
-        // STEP 2: Generate insights
-        console.log('Step 2: Generating insights...');
-        await generateInsights();
-        
-    } catch (error) {
-        console.error('Error in finishConversation:', error);
-        insightsContent.innerHTML = `
-            <div class="insight-item">
-                <h3>Processing Error</h3>
-                <p>There was an issue processing your responses: ${error.message}</p>
-                <p>Please check the console for details and try again.</p>
-            </div>
-        `;
-    }
+    // Save data and generate insights simultaneously
+    await Promise.all([
+        saveConversationData(),
+        generateInsights()
+    ]);
 }
 
-// FIXED: Enhanced saveConversationData function
-async function saveConversationData() {
-    try {
-        console.log('Saving conversation data for:', studentName);
-        console.log('Conversation data:', conversationData);
-        
-        if (!conversationData || conversationData.length === 0) {
-            throw new Error('No conversation data to save');
-        }
-        
-        // First, extract performance markers
-        console.log('Extracting performance markers...');
-        const markersResponse = await fetch(`${API_BASE_URL}/extract-markers`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                conversationData: conversationData,
-                studentName: studentName
-            })
-        });
-        
-        if (!markersResponse.ok) {
-            throw new Error(`Markers API error: ${markersResponse.status} ${markersResponse.statusText}`);
-        }
-        
-        const markersResult = await markersResponse.json();
-        console.log('Markers result:', markersResult);
-        
-        // Prepare complete conversation record
-        const conversationRecord = {
-            studentName: studentName,
-            timestamp: new Date().toISOString(),
-            week: getWeekIdentifier(),
-            responses: conversationData,
-            performanceMarkers: markersResult.success ? markersResult.markers : {},
-            completed: true
-        };
-        
-        console.log('Saving to Firestore:', conversationRecord);
-        
-        // Save to Firestore
-        const docRef = await db.collection('conversations').add(conversationRecord);
-        console.log('Conversation saved with ID:', docRef.id);
-        
-        // Also update student profile
-        await updateStudentProfile(conversationRecord);
-        
-        console.log('Conversation data saved successfully!');
-        
-    } catch (error) {
-        console.error('Error saving conversation data:', error);
-        throw error;
-    }
-}
-
-// FIXED: Enhanced generateInsights function
+// IMPROVED generateInsights function with better formatting
 async function generateInsights() {
     const insightsContent = document.getElementById('insightsContent');
     
+    // Show loading message with better styling
+    insightsContent.innerHTML = `
+        <div class="insight-item loading">
+            <div class="loading-animation">🤔</div>
+            <p>Analyzing your responses and generating personalized insights...</p>
+        </div>
+    `;
+    
     try {
-        console.log('Generating insights for:', studentName);
-        
-        if (!conversationData || conversationData.length === 0) {
-            throw new Error('No conversation data for insights');
-        }
-        
         const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
             method: 'POST',
             headers: {
@@ -198,58 +147,135 @@ async function generateInsights() {
             })
         });
         
-        if (!response.ok) {
-            throw new Error(`Analysis API error: ${response.status} ${response.statusText}`);
-        }
-        
         const result = await response.json();
-        console.log('Analysis result:', result);
         
         if (result.success) {
             // Clear loading message
             insightsContent.innerHTML = '';
             
-            // Add AI-generated insights
-            const analysisDiv = document.createElement('div');
-            analysisDiv.className = 'insight-item';
-            analysisDiv.innerHTML = `
-                <h3>Your Learning Insights This Week</h3>
-                <div class="analysis-content" style="white-space: pre-wrap; line-height: 1.6;">${result.analysis}</div>
+            // Create insights card with improved formatting
+            const insightsCard = document.createElement('div');
+            insightsCard.className = 'insights-card';
+            
+            // Clean up any remaining markdown formatting and apply proper HTML
+            const cleanAnalysis = cleanupFormattingForDisplay(result.analysis);
+            
+            insightsCard.innerHTML = `
+                <div class="insights-header">
+                    <h3>Your Personalized Learning Insights</h3>
+                    <div class="insights-subtitle">Based on your weekly reflection</div>
+                </div>
+                <div class="insights-content">
+                    ${cleanAnalysis}
+                </div>
+                <div class="insights-footer">
+                    <div class="model-attribution">
+                        Insights generated by ${result.model_used || 'AI Assistant'} • 
+                        Analysis completed ${new Date().toLocaleDateString()}
+                    </div>
+                </div>
             `;
             
-            // Show model info
-            if (result.model_used) {
-                const modelInfo = document.createElement('div');
-                modelInfo.className = 'model-info';
-                modelInfo.style.fontSize = '0.8em';
-                modelInfo.style.color = '#666';
-                modelInfo.style.marginTop = '10px';
-                modelInfo.textContent = `Analysis powered by: ${result.model_used}`;
-                analysisDiv.appendChild(modelInfo);
-            }
+            insightsContent.appendChild(insightsCard);
             
-            insightsContent.appendChild(analysisDiv);
+            // Add action buttons
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'insights-actions';
+            actionsDiv.innerHTML = `
+                <button onclick="resetConversation()" class="action-button primary">
+                    Complete Check-in
+                </button>
+                <button onclick="exportPersonalReport()" class="action-button secondary">
+                    Save My Report
+                </button>
+            `;
+            insightsContent.appendChild(actionsDiv);
             
         } else {
-            throw new Error(result.error || 'Analysis failed');
+            throw new Error('Analysis failed');
         }
         
     } catch (error) {
-        console.error('Error generating insights:', error);
+        console.error('Error getting insights:', error);
         insightsContent.innerHTML = `
-            <div class="insight-item">
-                <h3>Analysis Error</h3>
-                <p>We had trouble analyzing your responses: ${error.message}</p>
-                <p>Your data has been saved, but insights couldn't be generated.</p>
+            <div class="insight-item error">
+                <h3>Unable to Generate Insights</h3>
+                <p>We encountered an issue analyzing your responses. Your answers have been saved, and you can try again later.</p>
+                <button onclick="resetConversation()" class="action-button">Continue</button>
             </div>
         `;
     }
 }
 
+// NEW function to clean up formatting for better display
+function cleanupFormattingForDisplay(text) {
+    return text
+        // Replace any remaining markdown bold with HTML
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Replace any remaining markdown italic with HTML
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Replace bullet points with proper HTML
+        .replace(/•\s*(.*?)(?=\n|$)/g, '<div class="insight-point">• $1</div>')
+        .replace(/-\s*(.*?)(?=\n|$)/g, '<div class="insight-point">• $1</div>')
+        // Replace double newlines with paragraph breaks
+        .replace(/\n\n/g, '</p><p>')
+        // Replace single newlines with line breaks
+        .replace(/\n/g, '<br>')
+        // Wrap content in paragraphs if not already
+        .replace(/^(?!<)/g, '<p>')
+        .replace(/(?<!>)$/g, '</p>')
+        // Clean up any double paragraph tags
+        .replace(/<p><\/p>/g, '')
+        .replace(/<p>\s*<p>/g, '<p>')
+        .replace(/<\/p>\s*<\/p>/g, '</p>');
+}
+
+async function saveConversationData() {
+    try {
+        console.log('Starting to save conversation data...');
+        
+        // First, extract performance markers with improved prompt
+        const markersResponse = await fetch(`${API_BASE_URL}/extract-markers`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                conversationData: conversationData,
+                studentName: studentName
+            })
+        });
+        
+        const markersResult = await markersResponse.json();
+        console.log('Markers extraction result:', markersResult);
+        
+        // Prepare complete conversation record
+        const conversationRecord = {
+            studentName: studentName,
+            timestamp: new Date().toISOString(),
+            week: getWeekIdentifier(),
+            responses: conversationData,
+            performanceMarkers: markersResult.success ? markersResult.markers : {},
+            completed: true
+        };
+        
+        // Save to Firestore
+        await db.collection('conversations').add(conversationRecord);
+        console.log('Conversation saved to Firestore');
+        
+        // Also update student profile
+        await updateStudentProfile(conversationRecord);
+        console.log('Student profile updated');
+        
+        console.log('Conversation saved successfully!');
+        
+    } catch (error) {
+        console.error('Error saving conversation:', error);
+    }
+}
+
 async function updateStudentProfile(conversationRecord) {
     try {
-        console.log('Updating student profile for:', studentName);
-        
         const studentProfileRef = db.collection('students').doc(studentName);
         
         // Check if profile exists
@@ -266,7 +292,6 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.update(updatedProfile);
-            console.log('Student profile updated');
         } else {
             // Create new profile
             const newProfile = {
@@ -278,13 +303,60 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.set(newProfile);
-            console.log('New student profile created');
         }
         
     } catch (error) {
         console.error('Error updating student profile:', error);
-        throw error;
     }
+}
+
+// NEW function to export personal report
+function exportPersonalReport() {
+    const reportData = {
+        studentName: studentName,
+        date: new Date().toLocaleDateString(),
+        week: getWeekIdentifier(),
+        responses: conversationData,
+        analysisComplete: true
+    };
+    
+    const reportText = `
+Learning Reflection Report
+Student: ${reportData.studentName}
+Date: ${reportData.date}
+Week: ${reportData.week}
+
+RESPONSES:
+${conversationData.map((item, index) => 
+    `\n${index + 1}. ${item.question}\n   Answer: ${item.answer}`
+).join('\n')}
+
+Generated by AI Learning Partner
+    `.trim();
+    
+    const blob = new Blob([reportText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `learning-reflection-${studentName}-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function resetConversation() {
+    // Reset everything for next week
+    currentQuestionIndex = 0;
+    conversationData = [];
+    studentName = '';
+    
+    // Clear previous content
+    document.getElementById('insightsContent').innerHTML = '';
+    document.getElementById('messageArea').innerHTML = '';
+    document.getElementById('studentName').value = '';
+    
+    // Show login again
+    document.getElementById('insightsSection').classList.add('hidden');
+    document.getElementById('loginSection').classList.remove('hidden');
 }
 
 // Helper function to get week identifier
@@ -296,66 +368,9 @@ function getWeekIdentifier() {
     return `${year}-week-${week}`;
 }
 
-function resetConversation() {
-    // Reset everything for next week
-    currentQuestionIndex = 0;
-    conversationData = [];
-    studentName = '';
-    
-    // Clear previous insights
-    document.getElementById('insightsContent').innerHTML = '';
-    document.getElementById('messageArea').innerHTML = '';
-    document.getElementById('studentName').value = '';
-    
-    // Show login again
-    document.getElementById('insightsSection').classList.add('hidden');
-    document.getElementById('loginSection').classList.remove('hidden');
-}
-
-// FIXED: Add event listener after DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, setting up event listeners...');
-    
-    // Allow Enter key to send messages
-    const userInput = document.getElementById('userInput');
-    if (userInput) {
-        userInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-    }
-    
-    // Test API connection
-    console.log('Testing API connection to:', API_BASE_URL);
-    fetch(`${API_BASE_URL}/`)
-        .then(response => response.json())
-        .then(data => {
-            console.log('✅ API connection successful:', data);
-        })
-        .catch(error => {
-            console.error('❌ API connection failed:', error);
-        });
-    
-    // Test Firebase connection
-    if (typeof db !== 'undefined') {
-        console.log('✅ Firebase database initialized');
-    } else {
-        console.error('❌ Firebase database not initialized');
+// Allow Enter key to send messages
+document.getElementById('userInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendMessage();
     }
 });
-
-// ADDED: Debug function to check current state
-function debugCurrentState() {
-    console.log('=== DEBUG STATE ===');
-    console.log('Student Name:', studentName);
-    console.log('Current Question Index:', currentQuestionIndex);
-    console.log('Conversation Data:', conversationData);
-    console.log('API Base URL:', API_BASE_URL);
-    console.log('Firebase initialized:', typeof db !== 'undefined');
-    console.log('Total questions:', conversationQuestions.length);
-    console.log('==================');
-}
-
-// Make debug function available globally
-window.debugCurrentState = debugCurrentState;
