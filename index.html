@@ -1,107 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- FIXED: Use consistent Firebase v8 syntax -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-
-    <script>
-    // FIXED: Consistent Firebase v8 initialization
-    const firebaseConfig = {
-        apiKey: "AIzaSyAwFS_h6G8W19S02RCP5y-21XBanIDIzOQ",
-        authDomain: "ai-learning-partner.firebaseapp.com",
-        projectId: "ai-learning-partner",
-        storageBucket: "ai-learning-partner.firebasestorage.app",
-        messagingSenderId: "891144262835",
-        appId: "1:891144262835:web:182b88ca5dfd57c8530cc6"
-    };
-
-    // Initialize Firebase (v8 style)
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    
-    // Test Firebase connection
-    console.log('Firebase initialized successfully');
-    console.log('Firestore database:', db);
-    
-    // Test database connection
-    db.enableNetwork().then(() => {
-        console.log('✅ Firestore network enabled');
-    }).catch(error => {
-        console.error('❌ Firestore network error:', error);
-    });
-    </script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Learning Partner</title>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Firebase SDK - ONLY load the libraries, don't initialize here -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
-        <header>
+        <header class="header">
             <h1>Weekly Learning Check-in</h1>
             <p>Let's reflect on your week and discover insights about your learning journey.</p>
         </header>
 
         <div id="loginSection" class="section">
-            <h2>Welcome Back!</h2>
-            <input type="text" id="studentName" placeholder="Enter your name">
-            <button onclick="startConversation()">Start This Week's Conversation</button>
+            <div class="login-form">
+                <h2>Welcome Back!</h2>
+                <p>Ready to reflect on your learning journey this week?</p>
+                <div class="form-group">
+                    <input type="text" id="studentName" placeholder="Enter your name" />
+                </div>
+                <button class="btn" onclick="startConversation()">Start This Week's Conversation</button>
+            </div>
         </div>
 
         <div id="conversationSection" class="section hidden">
-            <div id="chatContainer">
-                <div id="messageArea"></div>
-                <div id="inputArea">
-                    <input type="text" id="userInput" placeholder="Type your response...">
-                    <button onclick="sendMessage()">Send</button>
+            <div class="conversation-header">
+                <h2>Learning Reflection</h2>
+                <div class="conversation-progress">
+                    <span id="questionCounter">Question 1 of 10</span>
                 </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 10%"></div>
+                </div>
+            </div>
+            
+            <div id="messageArea" class="message-area"></div>
+            
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="Type your thoughtful response here..." />
+                <button onclick="sendMessage()">Send</button>
             </div>
         </div>
 
         <div id="insightsSection" class="section hidden">
-            <h2>Your Learning Insights This Week</h2>
             <div id="insightsContent"></div>
-            <button onclick="resetConversation()">Complete Check-in</button>
-        </div>
-
-        <!-- ADDED: Status indicator for debugging -->
-        <div id="statusIndicator" style="position: fixed; bottom: 10px; right: 10px; background: #333; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; z-index: 1000;">
-            <div id="apiStatus">API: Testing...</div>
-            <div id="firebaseStatus">Firebase: Connected</div>
         </div>
     </div>
 
+    <!-- Load the script AFTER the HTML elements are defined -->
     <script src="script.js"></script>
-    
-    <script>
-        // ADDED: Status monitoring after page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Test API connection and update status
-            fetch('https://ai-learning-partner-production.up.railway.app/')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('apiStatus').textContent = 'API: Connected';
-                    document.getElementById('apiStatus').style.color = '#4CAF50';
-                    console.log('✅ API Status: Connected');
-                })
-                .catch(error => {
-                    document.getElementById('apiStatus').textContent = 'API: Disconnected';
-                    document.getElementById('apiStatus').style.color = '#f44336';
-                    console.error('❌ API Status: Disconnected', error);
-                });
-            
-            // Test Firebase status
-            if (typeof db !== 'undefined') {
-                document.getElementById('firebaseStatus').style.color = '#4CAF50';
-                console.log('✅ Firebase Status: Connected');
-            } else {
-                document.getElementById('firebaseStatus').textContent = 'Firebase: Error';
-                document.getElementById('firebaseStatus').style.color = '#f44336';
-                console.error('❌ Firebase Status: Error');
-            }
-        });
-    </script>
 </body>
 </html>
