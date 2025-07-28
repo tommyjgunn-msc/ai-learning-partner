@@ -19,6 +19,7 @@ const API_BASE_URL = 'https://ai-learning-partner-production.up.railway.app';
 let currentQuestionIndex = 0;
 let conversationData = [];
 let studentName = '';
+let isSaving = false; // Flag to prevent name clearing during save
 
 // Learning reflection questions
 const questions = [
@@ -79,11 +80,12 @@ function startConversation() {
         return;
     }
     
-    console.log('Starting conversation for:', studentName);
+    console.log('🎯 STARTING CONVERSATION FOR:', studentName);
     
     // Reset conversation state
     currentQuestionIndex = 0;
     conversationData = [];
+    isSaving = false;
     
     // Hide login, show conversation
     document.getElementById('loginSection').classList.add('hidden');
@@ -103,8 +105,8 @@ function askQuestion() {
         const question = questions[currentQuestionIndex];
         
         // Update progress indicators
-        questionCounter.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
-        progressFill.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
+        if (questionCounter) questionCounter.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+        if (progressFill) progressFill.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
         
         // Add question to chat
         addMessage(`Question ${currentQuestionIndex + 1}: ${question}`, 'bot-message');
@@ -125,7 +127,7 @@ function sendMessage() {
         return;
     }
     
-    console.log('User answered:', answer);
+    console.log('📝 USER ANSWERED:', answer);
     
     // Display user's answer
     addMessage(answer, 'user-message');
@@ -157,29 +159,45 @@ function addMessage(message, className) {
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
+// FIXED finishConversation - prevents race conditions
 async function finishConversation() {
-    console.log('Finishing conversation, conversation data:', conversationData);
+    console.log('🏁 FINISHING CONVERSATION FOR:', studentName);
+    console.log('💾 Conversation data length:', conversationData.length);
+    
+    // CRITICAL: Set saving flag to prevent name clearing
+    isSaving = true;
     
     // Hide conversation, show insights
     document.getElementById('conversationSection').classList.add('hidden');
     document.getElementById('insightsSection').classList.remove('hidden');
     
-    // Save data and generate insights simultaneously
-    await Promise.all([
-        saveConversationData(),
-        generateInsights()
-    ]);
+    // Save data FIRST, then generate insights
+    try {
+        await saveConversationData();
+        console.log('✅ SAVE COMPLETED FOR:', studentName);
+        await generateInsights();
+        console.log('✅ INSIGHTS GENERATED FOR:', studentName);
+    } catch (error) {
+        console.error('❌ ERROR IN FINISH CONVERSATION:', error);
+    } finally {
+        // Clear saving flag
+        isSaving = false;
+    }
 }
 
 async function generateInsights() {
     const insightsContent = document.getElementById('insightsContent');
+    
+    // Preserve the student name for this operation
+    const currentStudentName = studentName;
+    console.log('🧠 GENERATING INSIGHTS FOR:', currentStudentName);
     
     // Show loading message with better styling
     insightsContent.innerHTML = `
         <div class="insights-card">
             <div class="insights-header">
                 <h3>Analyzing Your Responses</h3>
-                <div class="insights-subtitle">Generating personalized insights...</div>
+                <div class="insights-subtitle">Generating personalized insights for ${currentStudentName}...</div>
             </div>
             <div class="loading">
                 <div class="loading-animation">🤔</div>
@@ -189,7 +207,7 @@ async function generateInsights() {
     `;
     
     try {
-        console.log('Requesting AI analysis...');
+        console.log('🔍 REQUESTING AI ANALYSIS FOR:', currentStudentName);
         
         const response = await fetch(`${API_BASE_URL}/analyze-conversation`, {
             method: 'POST',
@@ -198,7 +216,7 @@ async function generateInsights() {
             },
             body: JSON.stringify({
                 conversationData: conversationData,
-                studentName: studentName
+                studentName: currentStudentName // Use preserved name
             })
         });
         
@@ -207,7 +225,7 @@ async function generateInsights() {
         }
         
         const result = await response.json();
-        console.log('AI analysis result:', result);
+        console.log('✅ AI ANALYSIS RESULT FOR:', currentStudentName, result);
         
         if (result.success) {
             // Clear loading message
@@ -223,7 +241,7 @@ async function generateInsights() {
             insightsCard.innerHTML = `
                 <div class="insights-header">
                     <h3>Your Personalized Learning Insights</h3>
-                    <div class="insights-subtitle">Based on your weekly reflection</div>
+                    <div class="insights-subtitle">Based on ${currentStudentName}'s weekly reflection</div>
                 </div>
                 <div class="insights-content">
                     ${cleanAnalysis}
@@ -256,7 +274,7 @@ async function generateInsights() {
         }
         
     } catch (error) {
-        console.error('Error getting insights:', error);
+        console.error('❌ ERROR GETTING INSIGHTS FOR:', currentStudentName, error);
         insightsContent.innerHTML = `
             <div class="insights-card error">
                 <h3>Unable to Generate Insights</h3>
@@ -292,9 +310,21 @@ function cleanupFormattingForDisplay(text) {
         .replace(/<\/p>\s*<\/p>/g, '</p>');
 }
 
+// FIXED saveConversationData - preserves student name
 async function saveConversationData() {
+    // Capture the student name at the start to prevent it from being lost
+    const savedStudentName = studentName;
+    
+    if (!savedStudentName) {
+        console.error('❌ NO STUDENT NAME AVAILABLE FOR SAVING!');
+        console.error('Current studentName variable:', studentName);
+        console.error('Input field value:', document.getElementById('studentName')?.value);
+        return;
+    }
+    
     try {
-        console.log('Starting to save conversation data...');
+        console.log('💾 STARTING SAVE FOR:', savedStudentName);
+        console.log('📊 Conversation data:', conversationData);
         
         // First, extract performance markers with improved prompt
         const markersResponse = await fetch(`${API_BASE_URL}/extract-markers`, {
@@ -304,7 +334,7 @@ async function saveConversationData() {
             },
             body: JSON.stringify({
                 conversationData: conversationData,
-                studentName: studentName
+                studentName: savedStudentName // Use saved name
             })
         });
         
@@ -313,11 +343,11 @@ async function saveConversationData() {
         }
         
         const markersResult = await markersResponse.json();
-        console.log('Markers extraction result:', markersResult);
+        console.log('🎯 MARKERS EXTRACTION RESULT FOR:', savedStudentName, markersResult);
         
         // Prepare complete conversation record
         const conversationRecord = {
-            studentName: studentName,
+            studentName: savedStudentName, // Use saved name
             timestamp: new Date().toISOString(),
             week: getWeekIdentifier(),
             responses: conversationData,
@@ -325,26 +355,30 @@ async function saveConversationData() {
             completed: true
         };
         
-        console.log('Saving conversation record:', conversationRecord);
+        console.log('📝 SAVING CONVERSATION RECORD:', conversationRecord);
         
         // Save to Firestore
-        await db.collection('conversations').add(conversationRecord);
-        console.log('Conversation saved to Firestore');
+        const docRef = await db.collection('conversations').add(conversationRecord);
+        console.log('✅ CONVERSATION SAVED TO FIRESTORE WITH ID:', docRef.id);
+        console.log('👤 SAVED WITH STUDENT NAME:', conversationRecord.studentName);
         
         // Also update student profile
-        await updateStudentProfile(conversationRecord);
-        console.log('Student profile updated');
+        await updateStudentProfile(conversationRecord, savedStudentName);
+        console.log('✅ STUDENT PROFILE UPDATED FOR:', savedStudentName);
         
-        console.log('Conversation saved successfully!');
+        console.log('🎉 CONVERSATION SAVED SUCCESSFULLY FOR:', savedStudentName);
         
     } catch (error) {
-        console.error('Error saving conversation:', error);
+        console.error('❌ ERROR SAVING CONVERSATION FOR:', savedStudentName, error);
     }
 }
 
-async function updateStudentProfile(conversationRecord) {
+// FIXED updateStudentProfile - uses passed student name
+async function updateStudentProfile(conversationRecord, savedStudentName) {
     try {
-        const studentProfileRef = db.collection('students').doc(studentName);
+        console.log('👤 UPDATING STUDENT PROFILE FOR:', savedStudentName);
+        
+        const studentProfileRef = db.collection('students').doc(savedStudentName);
         
         // Check if profile exists
         const profileDoc = await studentProfileRef.get();
@@ -354,16 +388,18 @@ async function updateStudentProfile(conversationRecord) {
             const currentData = profileDoc.data();
             const updatedProfile = {
                 ...currentData,
+                studentName: savedStudentName, // Ensure name is set
                 lastConversation: conversationRecord.timestamp,
                 totalConversations: (currentData.totalConversations || 0) + 1,
                 latestMarkers: conversationRecord.performanceMarkers
             };
             
             await studentProfileRef.update(updatedProfile);
+            console.log('✅ UPDATED EXISTING PROFILE FOR:', savedStudentName);
         } else {
             // Create new profile
             const newProfile = {
-                studentName: studentName,
+                studentName: savedStudentName, // Ensure name is set
                 firstConversation: conversationRecord.timestamp,
                 lastConversation: conversationRecord.timestamp,
                 totalConversations: 1,
@@ -371,16 +407,19 @@ async function updateStudentProfile(conversationRecord) {
             };
             
             await studentProfileRef.set(newProfile);
+            console.log('✅ CREATED NEW PROFILE FOR:', savedStudentName);
         }
         
     } catch (error) {
-        console.error('Error updating student profile:', error);
+        console.error('❌ ERROR UPDATING STUDENT PROFILE FOR:', savedStudentName, error);
     }
 }
 
 function exportPersonalReport() {
+    const currentStudentName = studentName || 'Unknown Student';
+    
     const reportData = {
-        studentName: studentName,
+        studentName: currentStudentName,
         date: new Date().toLocaleDateString(),
         week: getWeekIdentifier(),
         responses: conversationData,
@@ -405,18 +444,31 @@ Generated by AI Learning Partner
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `learning-reflection-${studentName}-${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `learning-reflection-${currentStudentName}-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     window.URL.revokeObjectURL(url);
 }
 
+// FIXED resetConversation - prevents clearing name during save
 function resetConversation() {
-    console.log('Resetting conversation');
+    console.log('🔄 RESET CONVERSATION CALLED');
+    console.log('💾 Is currently saving?', isSaving);
+    console.log('👤 Current student name:', studentName);
+    
+    // Don't reset if we're still saving
+    if (isSaving) {
+        console.log('⏳ SAVE IN PROGRESS - DELAYING RESET');
+        setTimeout(resetConversation, 1000);
+        return;
+    }
+    
+    console.log('✅ SAFE TO RESET - CLEARING DATA');
     
     // Reset everything for next week
     currentQuestionIndex = 0;
     conversationData = [];
-    studentName = '';
+    studentName = ''; // Now safe to clear
+    isSaving = false;
     
     // Clear previous content
     document.getElementById('insightsContent').innerHTML = '';
@@ -433,6 +485,8 @@ function resetConversation() {
     document.getElementById('insightsSection').classList.add('hidden');
     document.getElementById('conversationSection').classList.add('hidden');
     document.getElementById('loginSection').classList.remove('hidden');
+    
+    console.log('🏠 RESET COMPLETE - BACK TO LOGIN');
 }
 
 // Helper function to get week identifier
